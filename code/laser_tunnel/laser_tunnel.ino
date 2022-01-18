@@ -38,8 +38,8 @@ constexpr auto fan_tach_pin = 2;
 static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
               "The tachometer output from the fan must be connected "
               "to a pin that can generated external interrupts.");
-constexpr auto fan_pwm_pin  = 3;
 
+const auto fan_pwm_pin   = DigitalOutputPin(3);
 const auto laser_pwm_pin = DigitalOutputPin(6);
 
 // Each bit in the pattern determines when the laser should
@@ -143,8 +143,7 @@ void setup() {
   pinMode(fan_tach_pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
 
-  pinMode(fan_pwm_pin, OUTPUT);
-  digitalWrite(fan_pwm_pin, HIGH);
+  fan_pwm_pin.begin(HIGH);
 
   // Use Timer/Counter2 to generate per-pixel interrupts.
   startPixelTimer();
@@ -158,9 +157,11 @@ void loop() {
 }
 
 void emergencyStop() {
-  stopPixelTimer();
+  noInterrupts();
   laser_pwm_pin.clear();
-  digitalWrite(fan_pwm_pin, LOW);
+  fan_pwm_pin.clear();
+  stopPixelTimer();  // to ensure laser isn't switched back on
+  interrupts();
   Serial.println("Emergency Stop!");
   Serial.println("Reset the microcontroller to restart.");
   for (;;) { delay(1000); }
