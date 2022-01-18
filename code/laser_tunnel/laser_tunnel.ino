@@ -3,55 +3,121 @@
 
 // Controls a PC fan and a laser to create a tunnel-like cone of light.
 // Designed for a 4-pin fan (GND, 12VDC, Tachometer, PWM control) and a
-// 5 mW laser module with a PWM pin.
+// 5-volt 5 mW laser module.
 
-constexpr auto fan_tach_pin = 2;  // Must be a pin that generates external interrupts
+// This code was developed on a 5-volt Arduino Pro Mini, but it should
+// be portable to any 5V Arduino board built around an AVR processor
+// that runs at least 16 MHz.
+
+class DigitalOutputPin {
+  public:
+    DigitalOutputPin(int8_t p) :
+      m_pin(p),
+      m_mask(digitalPinToBitMask(m_pin)),
+      m_output(portOutputRegister(digitalPinToPort(m_pin))) {}
+  
+      void begin(int initial=LOW) const {
+        pinMode(m_pin, OUTPUT);
+        write(initial);
+      }
+  
+      void clear()  const { *m_output &= ~m_mask; }
+      void set()    const { *m_output |=  m_mask; }
+      void toggle() const { *m_output ^=  m_mask; }
+      void write(int value) const {
+        if (value == LOW) clear(); else set();
+      }
+
+  private:
+      int8_t m_pin;
+      uint8_t m_mask;
+      uint8_t volatile *m_output;
+};
+
+constexpr auto fan_tach_pin = 2;
+static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
+              "The tachometer output from the fan must be connected "
+              "to a pin that can generated external interrupts.");
 constexpr auto fan_pwm_pin  = 3;
-constexpr auto laser_pwm_pin = 6;
+
+const auto laser_pwm_pin = DigitalOutputPin(6);
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
 // falling edge in the fan's tachometer signal, which occurs
 // twice per revolution.  Scanning wraps if the entire pattern
-// is used before the next techometer pulse.
-const uint32_t pattern = 0b11111111111100000000000100000000UL;
-// The bit in `scan_start` determines where in the pattern
-// scanning begins.
-volatile uint32_t scan_start = 1UL << 31;
-// The bit in the `scan_pos` indicates the current position in
-// the scan.
-volatile uint32_t scan_pos = scan_start;
+// is used before the next tachometer pulse.
+const uint8_t pattern[] = {
+  0b10101010,
+  0b11001100,
+  0b11001100,
+  0b11110000,
+  0b11110000,
+  0b11110000,
+  0b11110000,
+  0b11111111,
+  0b00000000,
+  0b11111111,
+  0b00000000,
+  0b11111111,
+  0b00000000,
+  0b11111111,
+  0b00000000,
+  0b11111111,
+  0b11111111,
+  0b00000000,
+  0b00000000,
+  0b11111111,
+  0b11111111,
+  0b00000000,
+  0b00000000,
+  0b11111111,
+  0b11111111,
+  0b00000000,
+  0b00000000,
+  0b11111111,
+  0b11111111,
+  0b00000000,
+  0b00000000
+};
+
+// `scan_start` is a bit offset into the pattern where the
+// scan should begin when the tachometer pulse is detected.
+// By animating `scan_start`, the tunnel appears to revolve.
+volatile uint8_t scan_byte = 0;
+volatile uint8_t scan_mask = 0b10000000;
+volatile uint8_t scan_start = 0;
+volatile bool pulse_flag = false;
 
 void fanPulseISR() {
+  pulse_flag = !pulse_flag;
+  if (pulse_flag) return;
   // Restart Timer/Counter2 and the `scan_pos`.  This will keep
   // the pattern aligned with the tachometer pulses.
   TCNT2 = 0;
-  scan_pos = scan_start;
-
-  // By animating `scan_start`, the tunnel appears to revolve.
-  scan_start <<= 1;
-  if (scan_start == 0) scan_start = 1;
+  scan_byte = scan_start >> 3;
+  scan_mask = 0b10000000u >> (scan_start & 0b0111);
 }
 
 ISR(TIMER2_COMPA_vect) {
-  static const auto port = digitalPinToPort(laser_pwm_pin);
-  static const auto mask = digitalPinToBitMask(laser_pwm_pin);
-  static uint8_t volatile * const reg = portOutputRegister(port);
-  if (scan_pos & pattern) {
-    *reg |= mask;
+  if (scan_mask & pattern[scan_byte]) laser_pwm_pin.set(); else laser_pwm_pin.clear();
+  
+  if (scan_mask != 1) {
+    scan_mask >>= 1;
   } else {
-    *reg &= ~mask;
+    scan_mask = 0b10000000;
+    scan_byte += 1;
+    if (scan_byte >= sizeof(pattern)) {
+      scan_byte = 0;
+    }
   }
-  scan_pos >>= 1;
-  if (scan_pos == 0) scan_pos = (1UL << 31);
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Laser Tunnel by Hayward Haunter");
 
-  pinMode(laser_pwm_pin, OUTPUT);
-  digitalWrite(laser_pwm_pin, LOW);
+  laser_pwm_pin.begin(LOW);
 
   pinMode(fan_tach_pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
@@ -60,11 +126,13 @@ void setup() {
   digitalWrite(fan_pwm_pin, HIGH);
 
   // Use Timer/Counter2 to generate interrupts.  In the ISR, we'll
-  // whether the laser should be on or off.  We'll restart the timer
-  // each time we get a pulse from the tachometer (twice per
-  // revolution), so our pattern of laser dots should be stable.
+  // turn the laser on or off.  Each time we get a pulse from the
+  // tachometer (twice per revolution), we'll restart this timer so
+  // our pattern of laser dots will always begins at the same two
+  // points around the circle.
   noInterrupts();
-  // Set the wave generation mode (3 bits across two registers) to CTC to OCR2A.
+  // Set the wave generation mode (3 bits across two registers) to
+  // compare timer/counter (CTC) to OCR2A.
   TCCR2A = (TCCR2A & 0b11111100) | (1 << WGM21);
   TCCR2B = (TCCR2B & 0b11110111);
   // Set the clock source prescaler to 64.
@@ -76,5 +144,16 @@ void setup() {
 }
 
 void loop() {
-  delay(250);
+  delay(5);
+  noInterrupts();
+  scan_start = (scan_start + 1) % (8*sizeof(pattern));
+  interrupts();
+}
+
+void emergencyStop() {
+  laser_pwm_pin.clear();
+  digitalWrite(fan_pwm_pin, LOW);
+  Serial.println("Emergency Stop!");
+  Serial.println("Reset the microcontroller to restart.");
+  for (;;) { delay(1000); }
 }
