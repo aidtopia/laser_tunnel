@@ -86,15 +86,36 @@ const uint8_t pattern[] = {
 // By animating `scan_start`, the tunnel appears to revolve.
 volatile uint8_t scan_byte = 0;
 volatile uint8_t scan_mask = 0b10000000;
-volatile uint8_t scan_start = 0;
+volatile uint16_t scan_start = 0;
 volatile bool pulse_flag = false;
+
+void startPixelTimer() {
+  // Set the wave generation mode (3 bits across two registers) to
+  // compare timer/counter (CTC) to OCR2A.
+  TCCR2A = (TCCR2A & 0b11111100) | (1 << WGM21);
+  TCCR2B = (TCCR2B & 0b11110111);
+  // Set the clock source prescaler to 64.
+  TCCR2B = (TCCR2B & 0b11111000) | (1 << CS22);
+  TCNT2 = 0;  // start counting from 0.
+  OCR2A = 16;  // how high to count
+  TIMSK2 |= (1 << OCIE2A);  // enable interrupt each time the counter reaches the limit
+}
+
+void stopPixelTimer() {
+  // Change the clock source to none.
+  TCCR2B = 0;
+  TIMSK2 = 0;
+}
+
+// Sets the pixel timer count back to zero.
+void resyncPixelTimer() {
+  TCNT2 = 0;
+}
 
 void fanPulseISR() {
   pulse_flag = !pulse_flag;
   if (pulse_flag) return;
-  // Restart Timer/Counter2 and the `scan_pos`.  This will keep
-  // the pattern aligned with the tachometer pulses.
-  TCNT2 = 0;
+  resyncPixelTimer();  // keep the pixel clock aligned with revolutions
   scan_byte = scan_start >> 3;
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
 }
@@ -125,22 +146,8 @@ void setup() {
   pinMode(fan_pwm_pin, OUTPUT);
   digitalWrite(fan_pwm_pin, HIGH);
 
-  // Use Timer/Counter2 to generate interrupts.  In the ISR, we'll
-  // turn the laser on or off.  Each time we get a pulse from the
-  // tachometer (twice per revolution), we'll restart this timer so
-  // our pattern of laser dots will always begins at the same two
-  // points around the circle.
-  noInterrupts();
-  // Set the wave generation mode (3 bits across two registers) to
-  // compare timer/counter (CTC) to OCR2A.
-  TCCR2A = (TCCR2A & 0b11111100) | (1 << WGM21);
-  TCCR2B = (TCCR2B & 0b11110111);
-  // Set the clock source prescaler to 64.
-  TCCR2B = (TCCR2B & 0b11111000) | (1 << CS22);
-  TCNT2 = 0;  // start counting from 0.
-  OCR2A = 16;  // how high to count
-  TIMSK2 |= (1 << OCIE2A);  // enable interrupt each time the counter reaches the limit
-  interrupts();
+  // Use Timer/Counter2 to generate per-pixel interrupts.
+  startPixelTimer();
 }
 
 void loop() {
@@ -151,6 +158,7 @@ void loop() {
 }
 
 void emergencyStop() {
+  stopPixelTimer();
   laser_pwm_pin.clear();
   digitalWrite(fan_pwm_pin, LOW);
   Serial.println("Emergency Stop!");
