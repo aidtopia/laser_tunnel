@@ -107,7 +107,7 @@ void stopPixelTimer() {
   TIMSK2 = 0;
 }
 
-// Sets the pixel timer count back to zero.
+// Sets the pixel timer back to zero.
 void resyncPixelTimer() {
   TCNT2 = 0;
 }
@@ -127,15 +127,12 @@ ISR(TIMER2_COMPA_vect) {
     scan_mask >>= 1;
   } else {
     scan_mask = 0b10000000;
-    scan_byte += 1;
-    if (scan_byte >= sizeof(pattern)) {
-      scan_byte = 0;
-    }
+    scan_byte = (scan_byte + 1) % sizeof(pattern);
   }
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("Laser Tunnel by Hayward Haunter");
 
   laser_pwm_pin.begin(LOW);
@@ -150,7 +147,7 @@ void setup() {
 }
 
 void loop() {
-  delay(5);
+  delay(16);
   noInterrupts();
   scan_start = (scan_start + 1) % (8*sizeof(pattern));
   interrupts();
