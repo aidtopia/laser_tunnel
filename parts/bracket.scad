@@ -20,16 +20,16 @@ module fan_laser_bracket(thickness=3, nozzle_d=0.4) {
         }
     }
 
-    translate([0, 20, 0]) intersection() {
+    intersection() {
         translate([0, 0, 40]) rotate([90, 0, 0]) fan_plate(thickness=5, $fs=nozzle_d/2);
         cube([80, 5, 16], center=true);
     }
-    translate([0, 0, thickness/2]) cube([30, 40, thickness], center=true);
-    translate([0, -17, 0]) {
+    translate([-7.5, -90, 0]) cube([15, 90, thickness]);
+    translate([0, 0, 40]) rotate([15, 0, 0]) translate([0, -90, -40]) {
         translate([0, 0, 40]) {
             rotate([90, 0, 0]) difference() {
                 rotate([0, 0, 45/2]) cylinder(h=6, d=9, center=true, $fn=8);
-                cylinder(h=9, d=6+nozzle_d, center=true, $fs=nozzle_d/2);
+                cylinder(h=9, d=6.2, center=true, $fs=nozzle_d/2);
                 translate([0, 3, 0]) cube([0.5, 6, 8], center=true);
             }
         }
@@ -37,5 +37,7 @@ module fan_laser_bracket(thickness=3, nozzle_d=0.4) {
     }
 }
 
-
-fan_laser_bracket(thickness=2);
+intersection() {
+    fan_laser_bracket(thickness=2);
+    translate([-50, -100, 0]) cube(110);
+}
