@@ -50,3 +50,24 @@ http://www.ecfr.gov/graphics/er01fe93.031.gif
 
 * TBD
 
+# Failure Modes
+
+These potential failures have been considered and the design attempts to mitigate the safety problems.
+
+**Failure:** The laser module is out of spec and outputs more than the rated 5 mW of power.
+
+**Mitigations:** An additional current-limiting resistor in series with the laser should bring down the total power of lasers at or slightly above 5 mW down below 5 mW.  The laser will be modulated with a duty cycle to bring down the output power.  The laser dot is reflected off a rapidly spinning mirror, greatly decreasing the time the beam might cross paths with an eyeball.
+
+**Failure:** The fan motor becomes obstructed so that it stops or spins slowly.
+
+**Mitigations:** A watchdog timer in the software will turn off the laser whenever the fan motor falls below a threshold speed (as measured by the tachometer pin).  The fan itself is designed to stop when obstructed to avoid overloading the motor.  The fan will attempt a restart after a few seconds.  If the problem is resolved, the fan will return to normal speed and the software will restart the laser.
+
+**Failure:** The mirror becomes detached as is thrown by the centrifugal force.
+
+**Mitigations:** The device enclosure should contain the mirror.  The centrifugal force should be relatively low, since the mirror will be approximately centered on the hub.  In absence of the mirror, the laser beam will terminate on the hub of the fan, which is a diffusely reflecting surface, thus no significant laser radiation should escape the enclosure.
+
+The device will have an emergency stop button.
+
+The device will have provisions for sensors to trigger the laser effect and to suppress it.  For example, a pressure map could disable the laser when someone steps too close to the beat.
+
+The device will have appropriate warning labels inside and out.
