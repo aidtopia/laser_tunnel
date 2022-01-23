@@ -1,6 +1,17 @@
 // Laser Tunnel -- Fan/Laser bracket
 // Adrian McCarthy 2022
 
+// Width of the fan. (mm)
+Fan_Size = 80; // [60, 80, 92, 120, 140, 180]
+
+// Depth of the fan. (mm)
+Fan_Depth = 25.4; // [15:0.2:35]
+
+// Screws used to mount the fan are typically M4, but you can choose #6-32 if metric screws aren't available.
+Fan_Screws = "M4"; // [M4, #6-32]
+
+module __Customizer_Limit__ () {}
+
 // https://github.com/aidtopia/PrintableParts/tree/main/libraries
 use <aidbolt.scad>
 use <aidutil.scad>
@@ -23,7 +34,7 @@ function find_fan_params(size) =
            str("fan size ", size, " mm not found in table"))
     candidate;
 
-module fan_laser_bracket(fan_size=80, fan_depth=25.4, laser_dia=6, laser_l=6, distance=95, angle=15, thickness=2, nozzle_d=0.4) {
+module fan_laser_bracket(fan_size=80, fan_depth=25.4, fan_screw="M4", laser_dia=6, laser_l=6, distance=95, angle=15, thickness=2, nozzle_d=0.4) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
     fan_h = fan_params[1];
@@ -57,25 +68,34 @@ module fan_laser_bracket(fan_size=80, fan_depth=25.4, laser_dia=6, laser_l=6, di
     }
 
     module fan_base() {
-        base_h = 10;
+        base_h = max(10, fan_h/8);
         w = fan_w + 2*thickness;
         d = fan_d + 2*thickness;
         h = base_h + thickness;
         offset = screw_sep/2;
-        screw_l = d + 3.5;  // +3.5 to approximate the nut
+
+        // Add some extra depth to the back for pocket nuts.
+        screw_l = round_up(d + 5, 5);
+        full_d = screw_l;
+        extra_d = full_d - d;
+        echo(str("Fan screws should be ", screw_l, " mm long"));
+
         translate([0, d/2, 0]) {
-            if ($preview) { #fan_envelope(); }
+            //if ($preview) { #fan_envelope(); }
             difference() {
                 translate([-w/2, -d/2, -fan_h/2-thickness]) difference() {
-                    cube([w, d, h]);
+                    union() {
+                        cube([w, d, h]);
+                        translate([0, d, 0]) cube([w, extra_d, h]);
+                    }
                     nudge = thickness - nozzle_d;
                     translate([nudge, nudge, nudge])
                         cube([fan_w+2*nozzle_d, fan_d+2*nozzle_d, h]);
                 }
-                rotate([90, 0, 0]) cylinder(h=d+2, d=fan_dia, center=true, $fn=64);
-                translate([0, d/2, -offset]) {
-                    translate([-offset, 0, 0]) rotate([-90, 90, 0]) bolt_hole("M4", screw_l);
-                    translate([ offset, 0, 0]) rotate([-90, 90, 0]) bolt_hole("M4", screw_l);
+                rotate([90, 0, 0]) cylinder(h=2*full_d, d=fan_dia, center=true, $fn=64);
+                translate([0, -d/2, -offset]) {
+                    translate([-offset, 0, 0]) rotate([90, 90, 0]) bolt_hole(fan_screw, screw_l, "recessed nut");
+                    translate([ offset, 0, 0]) rotate([90, 90, 0]) bolt_hole(fan_screw, screw_l, "recessed nut");
                 }
             }
         }
@@ -121,4 +141,4 @@ module fan_laser_bracket(fan_size=80, fan_depth=25.4, laser_dia=6, laser_l=6, di
     }
 }
 
-fan_laser_bracket(thickness=2);
+fan_laser_bracket(fan_size=Fan_Size, fan_depth=Fan_Depth, fan_screw=Fan_Screws, thickness=2);
