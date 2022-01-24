@@ -34,35 +34,36 @@ function find_fan_params(size) =
            str("fan size ", size, " mm not found in table"))
     candidate;
 
-module fan_laser_bracket(fan_size=80, fan_depth=25.4, fan_screw="M4", laser_dia=6, laser_l=6, distance=95, angle=15, thickness=2, nozzle_d=0.4) {
+module fan_laser_bracket(fan_size=80, fan_d=25.4, fan_screw="M4", laser_dia=6, laser_l=6, distance=95, angle=15, thickness=2, nozzle_d=0.4) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
     fan_h = fan_params[1];
     fan_dia = fan_params[2];
     screw_sep = fan_params[3];
-    fan_d = fan_depth;
     hub_h = thickness + fan_h/2;
 
     module fan_envelope() {
-        cube([fan_w, fan_d, fan_h], center=true);
-        rotate([90, 0, 0]) {
-            difference() {
-                cylinder(h=fan_d+10, d=fan_dia, center=true);
-                hub_dia = 22;
-                cylinder(h=fan_d+12, d=hub_dia, center=true);
-            }
-            offset = screw_sep/2;
-            translate([0, -offset, 0]) {
-                translate([-offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-                translate([offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-            }
-            translate([0, offset, 0]) {
-                translate([-offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-                translate([offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
+        hub_dia = 22;
+        difference() {
+            cube([fan_w, fan_d, fan_h], center=true);
+            rotate([90, 0, 0]) {
+                difference() {
+                    cylinder(h=fan_d+10, d=fan_dia, center=true);
+                    cylinder(h=fan_d+12, d=hub_dia, center=true);
+                }
+                offset = screw_sep/2;
+                translate([0, -offset, 0]) {
+                    translate([-offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                    translate([offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                }
+                translate([0, offset, 0]) {
+                    translate([-offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                    translate([offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                }
             }
         }
     }
@@ -81,7 +82,7 @@ module fan_laser_bracket(fan_size=80, fan_depth=25.4, fan_screw="M4", laser_dia=
         echo(str("Fan screws should be ", screw_l, " mm long"));
 
         translate([0, d/2, 0]) {
-            //if ($preview) { #fan_envelope(); }
+            if ($preview) { #fan_envelope(); }
             difference() {
                 translate([-w/2, -d/2, -fan_h/2-thickness]) difference() {
                     union() {
@@ -141,4 +142,4 @@ module fan_laser_bracket(fan_size=80, fan_depth=25.4, fan_screw="M4", laser_dia=
     }
 }
 
-fan_laser_bracket(fan_size=Fan_Size, fan_depth=Fan_Depth, fan_screw=Fan_Screws, thickness=2);
+fan_laser_bracket(fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, thickness=2);
