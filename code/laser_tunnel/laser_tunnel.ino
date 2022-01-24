@@ -40,7 +40,7 @@ static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
               "to a pin that can generated external interrupts.");
 
 const auto fan_pwm_pin   = DigitalOutputPin(3);
-const auto laser_pwm_pin = DigitalOutputPin(6);
+const auto laser_pwm_pin = DigitalOutputPin(4);
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
