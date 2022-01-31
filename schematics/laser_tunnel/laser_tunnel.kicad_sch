@@ -2067,7 +2067,7 @@
     (property "Value" "Arduino_Pro_Mini" (id 1) (at 147.4344 122.3488 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Package_DIP:DIP-24_W15.24mm_Socket" (id 2) (at 132.715 86.995 0)
+    (property "Footprint" "aid_Modules:Arduino_Pro_Mini" (id 2) (at 132.715 86.995 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "" (id 3) (at 132.715 86.995 0)
@@ -2170,7 +2170,7 @@
     (property "Value" "AudioJack3" (id 1) (at 252.222 38.0616 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Footprint" "Connector_Audio:Jack_3.5mm_CUI_SJ1-3535NG_Horizontal" (id 2) (at 245.11 36.83 0)
+    (property "Footprint" "Connector_Audio:Jack_3.5mm_CUI_SJ1-3535NG_Horizontal_CircularHoles" (id 2) (at 245.11 36.83 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 245.11 36.83 0)
@@ -2984,7 +2984,7 @@
       (reference "J6") (unit 1) (value "Conn_01x04_Male") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical")
     )
     (path "/3e9c0544-439c-4e22-91ba-7b21adadb8d4"
-      (reference "J7") (unit 1) (value "AudioJack3") (footprint "Connector_Audio:Jack_3.5mm_CUI_SJ1-3535NG_Horizontal")
+      (reference "J7") (unit 1) (value "AudioJack3") (footprint "Connector_Audio:Jack_3.5mm_CUI_SJ1-3535NG_Horizontal_CircularHoles")
     )
     (path "/62dd8802-71c1-4c28-bb72-690385a404d7"
       (reference "Q1") (unit 1) (value "Q_NPN_EBC") (footprint "Package_TO_SOT_THT:TO-92_Inline")
@@ -3032,7 +3032,7 @@
       (reference "TP3") (unit 1) (value "TestPoint") (footprint "TestPoint:TestPoint_Keystone_5005-5009_Compact")
     )
     (path "/19bcad94-0075-4d62-a06a-ce3a3b33a67c"
-      (reference "U1") (unit 1) (value "Arduino_Pro_Mini") (footprint "Package_DIP:DIP-24_W15.24mm_Socket")
+      (reference "U1") (unit 1) (value "Arduino_Pro_Mini") (footprint "aid_Modules:Arduino_Pro_Mini")
     )
     (path "/c504219b-6f0f-4697-8c08-42930c83c4a1"
       (reference "U2") (unit 1) (value "DFPlayerMini") (footprint "aid_Modules:DFPlayer_Mini")
