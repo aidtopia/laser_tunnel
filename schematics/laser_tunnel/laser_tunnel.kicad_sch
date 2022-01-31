@@ -2011,7 +2011,7 @@
     (property "Reference" "R8" (id 0) (at 194.818 37.8265 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "R" (id 1) (at 194.818 40.6016 0)
+    (property "Value" "330" (id 1) (at 194.818 40.6016 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" (id 2) (at 191.262 38.735 90)
@@ -2404,7 +2404,7 @@
     (property "Reference" "R7" (id 0) (at 194.818 28.9365 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "R" (id 1) (at 194.818 31.7116 0)
+    (property "Value" "180" (id 1) (at 194.818 31.7116 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" (id 2) (at 191.262 29.845 90)
@@ -3008,10 +3008,10 @@
       (reference "R6") (unit 1) (value "10K") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/75f44034-1669-48dc-b44c-bf2f918d9c95"
-      (reference "R7") (unit 1) (value "R") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R7") (unit 1) (value "180") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/0b1b5880-6d40-43fb-847e-8ebd98ff1a7d"
-      (reference "R8") (unit 1) (value "R") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R8") (unit 1) (value "330") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/a8177506-49cd-48db-ad8d-d176a7dd6fe6"
       (reference "RV1") (unit 1) (value "R_Potentiometer_Trim") (footprint "potentiometer:Potentiometer_Generic_Vertical_L10mm_P2.54mm_Inline")
