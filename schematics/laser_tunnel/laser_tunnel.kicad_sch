@@ -6,8 +6,9 @@
 
   (title_block
     (title "Laser Tunnel")
-    (date "2022-01-23")
-    (comment 1 "Adrian McCarthy (a.k.a. Hayward Haunter)")
+    (date "2022-01-30")
+    (comment 1 "https://github.com/aidtopia/laser_tunnel")
+    (comment 2 "Adrian McCarthy (a.k.a. Hayward Haunter)")
   )
 
   (lib_symbols
