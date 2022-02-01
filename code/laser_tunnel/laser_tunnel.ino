@@ -11,6 +11,7 @@
 
 #include <Arduino.h>
 #include "pins.h"
+#include "pixel_clock.h"
 
 constexpr auto fan_tach_pin = 2;
 static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
@@ -69,33 +70,10 @@ volatile uint8_t scan_mask = 0b10000000;
 volatile uint16_t scan_start = 0;
 volatile bool pulse_flag = false;
 
-void startPixelTimer() {
-  // Set the wave generation mode (3 bits across two registers) to
-  // compare timer/counter (CTC) to OCR2A.
-  TCCR2A = (TCCR2A & 0b11111100) | (1 << WGM21);
-  TCCR2B = (TCCR2B & 0b11110111);
-  // Set the clock source prescaler to 64.
-  TCCR2B = (TCCR2B & 0b11111000) | (1 << CS22);
-  TCNT2 = 0;  // start counting from 0.
-  OCR2A = 16;  // how high to count
-  TIMSK2 |= (1 << OCIE2A);  // enable interrupt each time the counter reaches the limit
-}
-
-void stopPixelTimer() {
-  // Change the clock source to none.
-  TCCR2B = 0;
-  TIMSK2 = 0;
-}
-
-// Sets the pixel timer back to zero.
-void resyncPixelTimer() {
-  TCNT2 = 0;
-}
-
 void fanPulseISR() {
   pulse_flag = !pulse_flag;
   if (pulse_flag) return;
-  resyncPixelTimer();  // keep the pixel clock aligned with revolutions
+  PixelClock::resync();  // keep the pixel clock aligned with revolutions
   scan_byte = scan_start >> 3;
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
 }
@@ -126,8 +104,7 @@ void setup() {
 
   emergency_stop.begin(INPUT_PULLUP);
 
-  // Use Timer/Counter2 to generate per-pixel interrupts.
-  startPixelTimer();
+  PixelClock::begin();
 }
 
 void loop() {
@@ -142,7 +119,7 @@ void loop() {
   noInterrupts();
   laser_pwm_pin.clear();
   fan_pwm_pin.clear();
-  stopPixelTimer();  // to ensure laser isn't switched back on
+  PixelClock::stop();  // to ensure laser isn't switched back on
   interrupts();
   Serial.println("Emergency Stop!");
   Serial.println("Reset the microcontroller to restart.");
