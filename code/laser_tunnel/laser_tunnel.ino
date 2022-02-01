@@ -9,74 +9,18 @@
 // be portable to any 5V Arduino board built around an AVR processor
 // that runs at least 16 MHz.
 
-class DigitalPin {
-  public:
-    explicit DigitalPin(int8_t p) : m_pin(p) {}
-
-    operator int() const { return m_pin; }
-
-  protected:
-    void mode(int mode) const { pinMode(m_pin, mode); }
-    uint8_t mask() const { return digitalPinToBitMask(m_pin); }
-    uint8_t volatile * outputReg() const { return portOutputRegister(digitalPinToPort(m_pin)); }
-    uint8_t const volatile * inputReg() const { return portInputRegister(digitalPinToPort(m_pin)); }
-
-  private:
-    int8_t m_pin;
-};
-
-class DigitalInputPin : public DigitalPin {
-  public:
-    explicit DigitalInputPin(int8_t p) :
-      DigitalPin(p),
-      m_mask(mask()),
-      m_input(inputReg()) {}
-
-    void begin() const { mode(INPUT); }
-    void begin(int x) const {
-      mode(x == INPUT_PULLUP ? INPUT_PULLUP : INPUT);
-    }
-    
-    int read() const { return (*m_input & m_mask) ? HIGH : LOW; }
-
-  private:
-      uint8_t m_mask;
-      uint8_t const volatile *m_input;
-};
-
-class DigitalOutputPin : public DigitalPin {
-  public:
-    explicit DigitalOutputPin(int8_t p) :
-      DigitalPin(p),
-      m_mask(mask()),
-      m_output(outputReg()) {}
-  
-      void begin(int initial=LOW) const {
-        mode(OUTPUT);
-        write(initial);
-      }
-  
-      void clear()  const { *m_output &= ~m_mask; }
-      void set()    const { *m_output |=  m_mask; }
-      void toggle() const { *m_output ^=  m_mask; }
-      void write(int value) const {
-        if (value == LOW) clear(); else set();
-      }
-
-  private:
-      uint8_t m_mask;
-      uint8_t volatile *m_output;
-};
+#include <Arduino.h>
+#include "pins.h"
 
 constexpr auto fan_tach_pin = 2;
 static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
               "The tachometer output from the fan must be connected "
               "to a pin that can generate external interrupts.");
 
-const auto fan_pwm_pin   = DigitalOutputPin(3);
-const auto laser_pwm_pin = DigitalOutputPin(4);
+const auto fan_pwm_pin    = DigitalOutputPin(3);
+const auto laser_pwm_pin  = DigitalOutputPin(4);
 const auto emergency_stop = DigitalInputPin(5);
-const auto status_pin    = DigitalOutputPin(LED_BUILTIN);
+const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
@@ -169,7 +113,8 @@ ISR(TIMER2_COMPA_vect) {
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Laser Tunnel by Hayward Haunter");
+  Serial.println(F("Laser Tunnel V1"));
+  Serial.println(F("Adrian McCarthy (a.k.a., Hayward Haunter) 2022"));
 
   status_pin.begin(LOW);
   laser_pwm_pin.begin(LOW);
