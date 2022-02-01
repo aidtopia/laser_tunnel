@@ -59,6 +59,7 @@ const uint8_t pattern[] = {
   0b11111111,
   0b11111111,
   0b00000000,
+  0b00000000,
   0b00000000
 };
 
@@ -105,6 +106,7 @@ void setup() {
   emergency_stop.begin(INPUT_PULLUP);
 
   PixelClock::begin();
+  PixelClock::compute(8*sizeof(pattern), 1800);
 }
 
 void loop() {

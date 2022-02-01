@@ -9,20 +9,17 @@
 
 class PixelClock {
   public:
-    static void begin() {
-      compute(640, 1800);
-      start();
-    }
+    static void begin() { start(); }
 
     static void start() {
       // Set the wave generation mode (3 bits across two registers) to
       // compare timer/counter (CTC) to OCR2A.
       TCCR2A = (TCCR2A & 0b11111100) | (1 << WGM21);
       TCCR2B = (TCCR2B & 0b11110111);
-      // Set the clock source prescaler to 64.
-      TCCR2B = (TCCR2B & 0b11111000) | (1 << CS22);
+      // Set the clock source prescaler to 32.
+      TCCR2B = (TCCR2B & 0b11111000) | (1 << CS21) | (1 << CS20);
       TCNT2 = 0;  // start counting from 0.
-      OCR2A = 16;  // how high to count
+      OCR2A = 65;  // how high to count
       TIMSK2 |= (1 << OCIE2A);  // enable interrupt each time the counter reaches the limit
     }
 
