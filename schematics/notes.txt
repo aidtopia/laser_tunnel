@@ -2,6 +2,33 @@ Laser Tunnel
 Schematic Notes
 Adrian McCarthy 2022-01-30
 
+TODO FROM REVIEW WITH REX
+
+CHECK REGULATOR ON PRO MINI FOR VOLTAGE LIMIT
+
+*** R3 should be based on hFE (or Beta).  Raise value to 2.2K-10K.  Drop R2 because it's not the voltage but the current that drives the transistor.
+
+
+NO LONG WIRE ON E-STOP BECAUSE OF POSSIBLE VOLTAGE SPIKE.  ALSO FOR TRIGGERS AND SUPPRESSION.  ADD PROTECTION CIRCUITRY
+
+DRAW AS INPUTS -> OUTPUTS, DON'T BREAK UP SO MUCH
+
+CONSIDER SERIES RESISTORS ON OPTIONAL OUTPUTS LIKE FOG AND HOUSELIGHTS FOR CURRENT LIMITING IF USER ACCIDENTALLY SHORTS THEM.  ALSO CONSIDER FEMALE HEADER INSTEAD OF MALE PINS.
+
++5V on the FOG/HOUSE-LIGHTS COULD OVERLOAD THE REGULATOR.  OFFER +12V THERE.  xxxx
+
+CHECK R7+R8 FOR TOTAL CURRENT DRAW ON TX.  SHOOT FOR 1mA.
+
+CHECK SOFTWARESERIAL FOR TIMER CONFLICTS.  TRY TO AVOID USING THE MAIN HARDWARE SERIAL FOR THE DFPLAYER MINI.
+
+CHECK CURRENT DRAW ON STATUS LINE.  ADDING THE LED ADDS CURRENT DRAW ON THE PIN.
+
+
+
+
+MY ORIGINAL NOTES
+
+
 The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
 
 The 12 volts is also provided to Arduino Pro Mini as RAW.  The Arduino's onboard regulator drops that to 5 V, which it also provides to other parts of the circuit.
@@ -43,3 +70,4 @@ I've instead used a voltage divider to drop the 5V output from MCU TX to 3.2 V. 
 [TODO:  Does it make sense to use the hardware serial?  Or should that be reserved for a debugging console and instead use two digital pins with SoftwareSerial?  I'm pretty tight on PINs on the Pro Mini, and I don't know whether SoftwareSerial will conflict with the software's use on the timers.]
 
 Finally, the STATUS line just drives an onboard LED that's easier to distinguish from the Pro Mini's onboard LED.
+
