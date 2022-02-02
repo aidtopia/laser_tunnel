@@ -2,23 +2,25 @@ Laser Tunnel
 Schematic Notes
 Adrian McCarthy 2022-01-30
 
-The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 65 mA.
+The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
 
 The 12 volts is also provided to Arduino Pro Mini as RAW.  The Arduino's onboard regulator drops that to 5 V, which it also provides to other parts of the circuit.
 
-[TODO: Consider using a buck regulator to drop the 12V to a regulated 7V.  This would improve efficiency and reliability.  The 12V input is at the spec limit for the Arduino Pro Mini's regulator.]
+[TODO: Consider using a buck regulator to drop the 12V to 7V.  This would improve efficiency and reliability.  The 12V input is at the spec limit for the Arduino Pro Mini's regulator, so if the power supply is a little high, we'd actually be exceeding it.]
 
 The fan connector is designed specifically for PC motherboards to connect to 12V cooling fans.  It's polarized and has connections for the fan tachometer and the fan PWM signal.  The fan itself pulls its PWM pin high (to 3.3V) so that the fan runs by default.  We don't want the fan to run by default, so we pull the pin low through a 1kOhm resistor, which is lower resistance than the fan's internal pull-up (approx 10kOhm).  Test points are provided for convenient checking of the tachometer and PWM signals with a scope.
 
 The laser diodes come with very fine, stranded leads, so my plan is to crimp ferrules onto them and use a 2-terminal screw connector to secure them to the board.  (Soldering would be OK, but that would make it harder to replace the laser if necessary.)
 
-An NPN transistor (2N3904) provides low-side switching of the laser.  A 1KOhm resistor limits the current into the transistor gate, and a 10KOhm resistor pulls the gate low if the MCU fails to drive the line.  A test point is provided for checking the laser's PWM signal.
+An NPN transistor (2N3904) provides low-side switching of the laser.  A 1KOhm resistor limits the current into the transistor gate, and a 10KOhm resistor pulls the gate low if the MCU fails to drive the line.  A test point is provided for checking the laser's PWM signal.  The switching speed is 20 kHz or lower.
 
 Per the product page, the laser diode produces 5mW output at 5V.  Class 3R lasers must be below 5mW (among other requirements).  Since the transistor has about a 0.2V drop between the collector and emitter, I expect the laser to emit slightly less than 5mW when powered continuously.
 
-The circuit will provide an "emergency stop" button on board, but there's a screw terminal block allowing an external switch/button to be added in parallel.  When E-STOP is pulled low, the software will turn off the laser and fan.  It will also drop the FOG output and raise the HOUSE-LIGHTS output.  Then it enters an infinite loop, flashing Morse code for SOS on the STATUS line until the MCU is reset.
+The circuit will provide an "emergency stop" button on board, but there's a screw terminal block allowing an external switch/button in parallel.  When E-STOP is pulled low, the software will turn off the laser and fan.  It will also drop the FOG output and raise the HOUSE-LIGHTS output.  Then it enters an infinite loop, flashing Morse code for SOS on the STATUS line until the MCU is reset.
 
-The two-row connector allows the user to use external sensors to trigger and/or suppress the effect.  For a sensor that acts as a switch (like a push button or a pressure mat), the sensor should connect from the -LO line to GND.  For active sensors that need 5V power and use a high value to signal activation (such as a PIR motion sensor), the sensor can be connected to the +5, -HI, and GND lines.  The -HI lines are pulled low on the board, and the -LO lines are pulled high on the MCU input pins, so unconnected pins will neither trigger nor suppress the effect.
+The two-row connector allows the user to use external sensors to trigger and/or suppress the effect.  For a sensor that acts as a switch (like a push button or a pressure mat), the sensor should connect from the -LO line to GND.  For active sensors that need power and use a high value to signal activation (such as a PIR motion sensor), the sensor can be connected to the +5V, -HI, and GND lines.  The -HI lines are pulled low on the board, and the -LO lines are pulled high on the MCU input pins, so unconnected pins will neither trigger nor suppress the effect.
+
+[Q: If the signal is 3.3V, might the pull-down bring it below the HIGH threshold for the 5V input pins?]
 
 If the user wants the effect to run continuously, they should place a jumper to connect TRIGGER-LO to GND.  Even with a continuous trigger, a SUPPRESS sensor may still be used.
 
@@ -26,13 +28,13 @@ The software will treat any SUPPRESS signal with higher precedence than any TRIG
 
 The FOG and HOUSE-LIGHTS signals are optional outputs for the user.  If they have a way to activate a burst from a fog machine or hazer, the FOG signal will go high for a period of time each time the effect is triggered.  The HOUSE-LIGHTS signal can be used to turn on lights in case of an emergency stop.  (For example, it could be wired to an IoT Power Relay to switch on a lamp.)
 
-Two onboard trim potentiomters are provided that will be used to set durations for fog bursts and to extend the suppress period beyond the clearing of a SUPPRESS signal.
+Two onboard trim potentiometers are provided that will be used to set durations for fog bursts and to extend the suppress period beyond the clearing of a SUPPRESS signal.
 
 [TODO:  A third trimpot could allow the user to set the effect duration beyond the initial trigger.]
 
 The DFPlayer Mini provides line-level audio signals (left and right) that the user may connect to an external amplifier and speakers via a 1/8" jack.  The onboard amplifier is low-power and not very useful for this application.  The USB drive options are not very useful versus using the on-board TF (micro SD) card slot.  The ADKEY and IO lines are not useful since the audio player will be controlled by serial commands from the MCU.  [TODO:  Figure out whether any/all of those unconnected pins should be tied to GND.]
 
-The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the serial signals between the MCU and the pluer.  The common solution used by many is to simply put a resistor in series between the MCU TX and the player RX, and to rely on the fact that a 3.3 V from the player's TX should be detected as logic HIGH by the MCU RX.
+The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the serial signals between the MCU and the player.  The common solution used by many is to simply put a 1K resistor in series between the MCU TX and the player RX, and to rely on the fact that a 3.3 V from the player's TX should be detected as logic HIGH by the MCU RX.  (In fact, this is recommended in one of the poorly-translated datasheets.)
 
 I've instead used a voltage divider to drop the 5V output from MCU TX to 3.2 V.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
 
