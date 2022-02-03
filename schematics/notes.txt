@@ -1,33 +1,26 @@
-Laser Tunnel
-Schematic Notes
+#Laser Tunnel
+Schematic Notes<br>
 Adrian McCarthy 2022-01-30
 
-TODO FROM REVIEW WITH REX
+## Remaining Action Items
 
-CHECK REGULATOR ON PRO MINI FOR VOLTAGE LIMIT
+[From review with Rex]
 
-*** R3 should be based on hFE (or Beta).  Raise value to 2.2K-10K.  Drop R2 because it's not the voltage but the current that drives the transistor.
+* Check limit on Pro Mini's voltage regulator.
 
+* Add protection against voltage spikes that long wires from the inputs to the emergency stop and sensor inputs might introduce.
 
-NO LONG WIRE ON E-STOP BECAUSE OF POSSIBLE VOLTAGE SPIKE.  ALSO FOR TRIGGERS AND SUPPRESSION.  ADD PROTECTION CIRCUITRY
+* Lay out drawing as INPUTS -> OUTPUTS.  Do not break it into more modules than necessary.
 
-DRAW AS INPUTS -> OUTPUTS, DON'T BREAK UP SO MUCH
+* Consider series resistors on optional outputs (like FOG and HOUSE-LIGHTS) to limit current if the user accidentally shorts them.  Use a female header to reduce the risk of a short.
 
-CONSIDER SERIES RESISTORS ON OPTIONAL OUTPUTS LIKE FOG AND HOUSELIGHTS FOR CURRENT LIMITING IF USER ACCIDENTALLY SHORTS THEM.  ALSO CONSIDER FEMALE HEADER INSTEAD OF MALE PINS.
+* +5V on the FOG/HOUSE-LIGHTS could overload the regulator.  Offer +12V there.
 
-+5V on the FOG/HOUSE-LIGHTS COULD OVERLOAD THE REGULATOR.  OFFER +12V THERE.  xxxx
+* Check R7+R8 (voltage divider for DFPlayer Mini's RX).  Shoot for 1 mA.
 
-CHECK R7+R8 FOR TOTAL CURRENT DRAW ON TX.  SHOOT FOR 1mA.
+* Check SoftwareSerial for timer conflicts and avoid using the main hardware serial for the DFPlayer Mini.
 
-CHECK SOFTWARESERIAL FOR TIMER CONFLICTS.  TRY TO AVOID USING THE MAIN HARDWARE SERIAL FOR THE DFPLAYER MINI.
-
-CHECK CURRENT DRAW ON STATUS LINE.  ADDING THE LED ADDS CURRENT DRAW ON THE PIN.
-
-
-
-
-MY ORIGINAL NOTES
-
+## Design Notes
 
 The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
 
@@ -39,15 +32,13 @@ The fan connector is designed specifically for PC motherboards to connect to 12V
 
 The laser diodes come with very fine, stranded leads, so my plan is to crimp ferrules onto them and use a 2-terminal screw connector to secure them to the board.  (Soldering would be OK, but that would make it harder to replace the laser if necessary.)
 
-An NPN transistor (2N3904) provides low-side switching of the laser.  A 1KOhm resistor limits the current into the transistor gate, and a 10KOhm resistor pulls the gate low if the MCU fails to drive the line.  A test point is provided for checking the laser's PWM signal.  The switching speed is 20 kHz or lower.
+An NPN transistor (2N3904) provides low-side switching of the laser.  A 1KOhm resistor limits the current into the transistor gate, and a 10KOhm resistor pulls the gate low if the MCU fails to drive the line.  A test point is provided for checking the laser's PWM signal.  The switching speed is 20 kHz or lower.  Base resistor chosen to ensure 2.5 mA to base with a worst-case of 0.89 mA drop from base to emitter.
 
 Per the product page, the laser diode produces 5mW output at 5V.  Class 3R lasers must be below 5mW (among other requirements).  Since the transistor has about a 0.2V drop between the collector and emitter, I expect the laser to emit slightly less than 5mW when powered continuously.
 
 The circuit will provide an "emergency stop" button on board, but there's a screw terminal block allowing an external switch/button in parallel.  When E-STOP is pulled low, the software will turn off the laser and fan.  It will also drop the FOG output and raise the HOUSE-LIGHTS output.  Then it enters an infinite loop, flashing Morse code for SOS on the STATUS line until the MCU is reset.
 
 The two-row connector allows the user to use external sensors to trigger and/or suppress the effect.  For a sensor that acts as a switch (like a push button or a pressure mat), the sensor should connect from the -LO line to GND.  For active sensors that need power and use a high value to signal activation (such as a PIR motion sensor), the sensor can be connected to the +5V, -HI, and GND lines.  The -HI lines are pulled low on the board, and the -LO lines are pulled high on the MCU input pins, so unconnected pins will neither trigger nor suppress the effect.
-
-[Q: If the signal is 3.3V, might the pull-down bring it below the HIGH threshold for the 5V input pins?]
 
 If the user wants the effect to run continuously, they should place a jumper to connect TRIGGER-LO to GND.  Even with a continuous trigger, a SUPPRESS sensor may still be used.
 
@@ -65,9 +56,4 @@ The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it act
 
 I've instead used a voltage divider to drop the 5V output from MCU TX to 3.2 V.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
 
-[TODO:  Consider whether something needs to be done for the player TX to the MCU RX.  For example, could I use a transistor to boost the 3.3V signal to 5 volts?]
-
-[TODO:  Does it make sense to use the hardware serial?  Or should that be reserved for a debugging console and instead use two digital pins with SoftwareSerial?  I'm pretty tight on PINs on the Pro Mini, and I don't know whether SoftwareSerial will conflict with the software's use on the timers.]
-
-Finally, the STATUS line just drives an onboard LED that's easier to distinguish from the Pro Mini's onboard LED.
-
+The LED on board the Pro Mini (digital pin 13) will be used to indicate status conditions.
