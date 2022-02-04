@@ -14,11 +14,11 @@ Adrian McCarthy 2022-01-30
 
 ## Design Notes
 
-The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
+The power jack expects a 12V, center positive, 2.1mm plug barrel plug.
+
+The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
 
 The 12 volts is also provided to Arduino Pro Mini as RAW.  The Arduino's onboard regulator drops that to 5 V, which it also provides to other parts of the circuit.
-
-[TODO: Consider using a buck regulator to drop the 12V to 7V.  This would improve efficiency and reliability.  The 12V input is at the spec limit for the Arduino Pro Mini's regulator, so if the power supply is a little high, we'd actually be exceeding it.]
 
 The fan connector is designed specifically for PC motherboards to connect to 12V cooling fans.  It's polarized and has connections for the fan tachometer and the fan PWM signal.  The fan itself pulls its PWM pin high (to 3.3V) so that the fan runs by default.  We don't want the fan to run by default, so we pull the pin low through a 1kOhm resistor, which is lower resistance than the fan's internal pull-up (approx 10kOhm).  Test points are provided for convenient checking of the tachometer and PWM signals with a scope.
 
