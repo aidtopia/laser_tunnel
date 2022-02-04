@@ -12,10 +12,6 @@ Adrian McCarthy 2022-01-30
 
 * Lay out drawing as INPUTS -> OUTPUTS.  Do not break it into more modules than necessary.
 
-* Consider series resistors on optional outputs (like FOG and HOUSE-LIGHTS) to limit current if the user accidentally shorts them.  Use a female header to reduce the risk of a short.
-
-* +5V on the FOG/HOUSE-LIGHTS could overload the regulator.  Offer +12V there.
-
 * Check R7+R8 (voltage divider for DFPlayer Mini's RX).  Shoot for 1 mA.
 
 * Check SoftwareSerial for timer conflicts and avoid using the main hardware serial for the DFPlayer Mini.
@@ -42,9 +38,13 @@ The two-row connector allows the user to use external sensors to trigger and/or 
 
 If the user wants the effect to run continuously, they should place a jumper to connect TRIGGER-LO to GND.  Even with a continuous trigger, a SUPPRESS sensor may still be used.
 
-The software will treat any SUPPRESS signal with higher precedence than any TRIGGER signal.  SUPPRESS will turn off the laser and the fog signal.  This is not an emergency stop.  Once the SUPPRESS signal is cleared, the next TRIGGER signal will restart the effect.
+The software will treat any SUPPRESS signal with higher precedence than any TRIGGER signal.  SUPPRESS will turn off the laser and the FOG signal.  This is not an emergency stop.  Once the SUPPRESS signal is cleared, the next TRIGGER signal will restart the effect.
 
-The FOG and HOUSE-LIGHTS signals are optional outputs for the user.  If they have a way to activate a burst from a fog machine or hazer, the FOG signal will go high for a period of time each time the effect is triggered.  The HOUSE-LIGHTS signal can be used to turn on lights in case of an emergency stop.  (For example, it could be wired to an IoT Power Relay to switch on a lamp.)
+The FOG and HOUSE-LIGHTS signals are optional outputs for the user.  If they have a way to activate a burst from a fog machine or hazer, the FOG signal will go high for a period of time each time the effect is triggered.  The outputs are signal-level, and have current limiting resistors to protect the Pro Mini in case the user accidentally shorts them.
+
+Power and a ground reference are provided adjacent to the FOG and HOUSE-LIGHTS signals.  Since the +5V source comes from the Pro Mini's regulator, it has limited current.  It should be used only for the lower-power side of an optoisolated relay board.  The +12V pin, if the supply can provide enough current, is more appropriate for powering relay coils.
+
+The HOUSE-LIGHTS signal can be used to turn on lights in case of an emergency stop.  (For example, it could be wired to an IoT Power Relay to switch on a lamp.)
 
 Two onboard trim potentiometers are provided that will be used to set durations for fog bursts and to extend the suppress period beyond the clearing of a SUPPRESS signal.
 
