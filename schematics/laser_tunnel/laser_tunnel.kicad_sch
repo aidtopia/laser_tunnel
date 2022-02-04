@@ -2471,7 +2471,7 @@
     (in_bom yes) (on_board yes) (fields_autoplaced)
     (uuid b9256c4c-489f-4631-91a3-68cb4e60ac10)
     (property "Reference" "R3" (id 0) (at 212.725 31.8475 90))
-    (property "Value" "1.5K" (id 1) (at 212.725 34.6226 90))
+    (property "Value" "1K" (id 1) (at 212.725 34.6226 90))
     (property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" (id 2) (at 212.725 38.608 90)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -2884,7 +2884,7 @@
       (reference "R1") (unit 1) (value "1K") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/b9256c4c-489f-4631-91a3-68cb4e60ac10"
-      (reference "R3") (unit 1) (value "1.5K") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R3") (unit 1) (value "1K") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/c1ada1e8-0bb4-4042-81c0-d12c6843ae13"
       (reference "R5") (unit 1) (value "10K") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
