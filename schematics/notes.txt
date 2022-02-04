@@ -12,10 +12,6 @@ Adrian McCarthy 2022-01-30
 
 * Lay out drawing as INPUTS -> OUTPUTS.  Do not break it into more modules than necessary.
 
-* Check R7+R8 (voltage divider for DFPlayer Mini's RX).  Shoot for 1 mA.
-
-* Check SoftwareSerial for timer conflicts and avoid using the main hardware serial for the DFPlayer Mini.
-
 ## Design Notes
 
 The power jack expects a 12V, center positive, 2.1mm plug barrel plug.  The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draws about 50-60 mA.
@@ -52,8 +48,10 @@ Two onboard trim potentiometers are provided that will be used to set durations 
 
 The DFPlayer Mini provides line-level audio signals (left and right) that the user may connect to an external amplifier and speakers via a 1/8" jack.  The onboard amplifier is low-power and not very useful for this application.  The USB drive options are not very useful versus using the on-board TF (micro SD) card slot.  The ADKEY and IO lines are not useful since the audio player will be controlled by serial commands from the MCU.  [TODO:  Figure out whether any/all of those unconnected pins should be tied to GND.]
 
-The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the serial signals between the MCU and the player.  The common solution used by many is to simply put a 1K resistor in series between the MCU TX and the player RX, and to rely on the fact that a 3.3 V from the player's TX should be detected as logic HIGH by the MCU RX.  (In fact, this is recommended in one of the poorly-translated datasheets.)
+The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the MCU TX to the player's RX.  The common solution used by many is to simply put a 1K resistor in series.
 
-I've instead used a voltage divider to drop the 5V output from MCU TX to 3.2 V.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
+I've instead used a voltage divider to drop the 5V output from MCU TX to 3.24 V without drawing much current.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
+
+The SoftwareSerial library disables interrupts while writing, which means we won't be able to send commands to the audio player while running the effect.  Thus we'll send commands when there is a trigger and before starting the laser effect.  Instead of reading serial responses from the board, we'll monitor the BUSY pin output from the audio player to know when the track ends.
 
 The LED on board the Pro Mini (digital pin 13) will be used to indicate status conditions.
