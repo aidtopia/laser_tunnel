@@ -1,16 +1,6 @@
-#Laser Tunnel
+# Laser Tunnel
 Schematic Notes<br>
-Adrian McCarthy 2022-01-30
-
-## Remaining Action Items
-
-[From review with Rex]
-
-* Check limit on Pro Mini's voltage regulator.
-
-* Add protection against voltage spikes that long wires from the inputs to the emergency stop and sensor inputs might introduce.
-
-* Lay out drawing as INPUTS -> OUTPUTS.  Do not break it into more modules than necessary.
+Adrian McCarthy 2022-02-04
 
 ## Design Notes
 
@@ -20,7 +10,11 @@ The 12 volts is provided directly to the PC fan.  At full speed, the PC fan draw
 
 The 12 volts is also provided to Arduino Pro Mini as RAW.  The Arduino's onboard regulator drops that to 5 V, which it also provides to other parts of the circuit.
 
-The fan connector is designed specifically for PC motherboards to connect to 12V cooling fans.  It's polarized and has connections for the fan tachometer and the fan PWM signal.  The fan itself pulls its PWM pin high (to 3.3V) so that the fan runs by default.  We don't want the fan to run by default, so we pull the pin low through a 1kOhm resistor, which is lower resistance than the fan's internal pull-up (approx 10kOhm).  Test points are provided for convenient checking of the tachometer and PWM signals with a scope.
+The fan connector is designed specifically for PC motherboards to connect to 12V cooling fans.  It's polarized and has connections for the fan tachometer and the fan PWM signal.  The fan itself pulls its PWM pin high (to 3.3V) so that the fan runs by default.  We don't want the fan to run by default, so we pull the pin low through a 1kOhm resistor, which is lower resistance than the fan's internal pull-up (approx 10kOhm).
+
+Although we use the PWM pin to turn the fan on and off, we generally treat the fan as an input.  The tachometer signal is key to synchronizing the display.
+
+Test points are provided for convenient checking of the tachometer and PWM signals with a scope.
 
 The laser diodes come with very fine, stranded leads, so my plan is to crimp ferrules onto them and use a 2-terminal screw connector to secure them to the board.  (Soldering would be OK, but that would make it harder to replace the laser if necessary.)
 
@@ -30,28 +24,30 @@ Per the product page, the laser diode produces 5mW output at 5V.  Class 3R laser
 
 The circuit will provide an "emergency stop" button on board, but there's a screw terminal block allowing an external switch/button in parallel.  When E-STOP is pulled low, the software will turn off the laser and fan.  It will also drop the FOG output and raise the HOUSE-LIGHTS output.  Then it enters an infinite loop, flashing Morse code for SOS on the STATUS line until the MCU is reset.
 
-The two-row connector allows the user to use external sensors to trigger and/or suppress the effect.  For a sensor that acts as a switch (like a push button or a pressure mat), the sensor should connect from the -LO line to GND.  For active sensors that need power and use a high value to signal activation (such as a PIR motion sensor), the sensor can be connected to the +5V, -HI, and GND lines.  The -HI lines are pulled low on the board, and the -LO lines are pulled high on the MCU input pins, so unconnected pins will neither trigger nor suppress the effect.
+Two headers allow the user to use external sensors to trigger and/or suppress the effect.  For a sensor that acts as a switch (like a push button or a pressure mat), the sensor should connect from the -LO line to GND (pin 3 to pin 4).  For active sensors that need power and use a high value to signal activation, such as a PIR module, the sensor can be connected to the +5V, -HI, and GND lines (pins 1, 2, and 3).  The -HI lines are pulled low on the board, and the -LO lines are pulled high on the MCU input pins, so unconnected pins will neither trigger nor suppress the effect.
 
 If the user wants the effect to run continuously, they should place a jumper to connect TRIGGER-LO to GND.  Even with a continuous trigger, a SUPPRESS sensor may still be used.
 
 The software will treat any SUPPRESS signal with higher precedence than any TRIGGER signal.  SUPPRESS will turn off the laser and the FOG signal.  This is not an emergency stop.  Once the SUPPRESS signal is cleared, the next TRIGGER signal will restart the effect.
 
-The FOG and HOUSE-LIGHTS signals are optional outputs for the user.  If they have a way to activate a burst from a fog machine or hazer, the FOG signal will go high for a period of time each time the effect is triggered.  The outputs are signal-level, and have current limiting resistors to protect the Pro Mini in case the user accidentally shorts them.
+The optional external inputs (emergency stop, suppress, and trigger) may be connected to long wires, so they each have protection against voltage spikes that may occur from electrostatic discharge, induction, etc.
 
-Power and a ground reference are provided adjacent to the FOG and HOUSE-LIGHTS signals.  Since the +5V source comes from the Pro Mini's regulator, it has limited current.  It should be used only for the lower-power side of an optoisolated relay board.  The +12V pin, if the supply can provide enough current, is more appropriate for powering relay coils.
+The FOG and HOUSE-LIGHTS signals are optional outputs.  If the user has a way to activate a burst from a fog machine or hazer, the FOG signal will go high for a period of time each time the effect is triggered.  The outputs are signal-level, and have current limiting resistors to protect the Pro Mini in case the user accidentally shorts them.
 
-The HOUSE-LIGHTS signal can be used to turn on lights in case of an emergency stop.  (For example, it could be wired to an IoT Power Relay to switch on a lamp.)
+Power and a ground reference are provided adjacent to the FOG and HOUSE-LIGHTS signals.  Since the +5V source comes from the Pro Mini's regulator, it has limited current.  It should be used only for the low-power side of an optoisolated relay board.  The +12V pin, if the supply can provide enough current, is more appropriate for powering relay coils, though it's still important to use snubber diodes.
+
+The HOUSE-LIGHTS signal can be used to turn on lights in case of an emergency stop.  For example, it could be wired to an IoT Power Relay to switch on a lamp.
 
 Two onboard trim potentiometers are provided that will be used to set durations for fog bursts and to extend the suppress period beyond the clearing of a SUPPRESS signal.
 
-[TODO:  A third trimpot could allow the user to set the effect duration beyond the initial trigger.]
+The DFPlayer Mini provides line-level audio signals (left and right) that the user may connect to an external amplifier and speakers via a 1/8" jack.  The onboard amplifier, being low power, is not very useful for this application, so it is not connected.  Neither are the USB drive options, nor the ADKEY and IO lines.
 
-The DFPlayer Mini provides line-level audio signals (left and right) that the user may connect to an external amplifier and speakers via a 1/8" jack.  The onboard amplifier is low-power and not very useful for this application.  The USB drive options are not very useful versus using the on-board TF (micro SD) card slot.  The ADKEY and IO lines are not useful since the audio player will be controlled by serial commands from the MCU.  [TODO:  Figure out whether any/all of those unconnected pins should be tied to GND.]
+The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the MCU TX to the player's RX.  The common solution used by many is to simply put a 1K resistor in series.  I've instead used a voltage divider to drop the 5V output from MCU TX to 3.24 V without drawing much current.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
 
-The DFPlayer Mini takes 5V input, but it has an onboard regulator so that it actually runs at 3.3V.  Ideally, a level shifter should be used for the MCU TX to the player's RX.  The common solution used by many is to simply put a 1K resistor in series.
+The SoftwareSerial library disables interrupts while writing, which means we won't be able to send commands to the audio player while running the effect.  Thus we'll send commands when there is a trigger just before starting the laser effect.  Instead of reading serial responses from the board, we'll monitor the BUSY pin output from the audio player to know when the track ends.  (I've still connected the response line because it might be useful to have two-way communication during initialization.)
 
-I've instead used a voltage divider to drop the 5V output from MCU TX to 3.24 V without drawing much current.  This works well on the bench.  The baud rate is only 9600, so there's not much concern about timing.
+The LED on board the Pro Mini (digital pin 13) will be used to indicate status conditions by blinking.
 
-The SoftwareSerial library disables interrupts while writing, which means we won't be able to send commands to the audio player while running the effect.  Thus we'll send commands when there is a trigger and before starting the laser effect.  Instead of reading serial responses from the board, we'll monitor the BUSY pin output from the audio player to know when the track ends.
+The hardware serial will be accessible through the FTDI connector on the Pro Mini, so the software can be debugged and updated as needed.
 
-The LED on board the Pro Mini (digital pin 13) will be used to indicate status conditions.
+[TODO:  Should I provide a way to disconnect the RAW pin from the 12V when using the FTDI power?]
