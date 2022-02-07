@@ -1,4 +1,5 @@
 *.stl
 schematics/laser_tunnel/laser_tunnel-backups
 schematics/laser_tunnel/fp-info-cache
+schematics/laser_tunnel/input_protection/input_protection-backups/
 norcal_haunters
