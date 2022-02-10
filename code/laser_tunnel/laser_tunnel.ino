@@ -6,8 +6,7 @@
 // 5-volt 5 mW laser module.
 
 // This code was developed on a 5-volt Arduino Pro Mini, but it should
-// be portable to any 5V Arduino board built around an AVR processor
-// that runs at least 16 MHz.
+// be portable to any 5V/16 MHz AVR processor.
 
 #include <Arduino.h>
 #include "pins.h"
@@ -63,20 +62,26 @@ const uint8_t pattern[] = {
   0b00000000
 };
 
+constexpr uint16_t pattern_size = 8*sizeof(pattern);
+
 // `scan_start` is a bit offset into the pattern where the
 // scan should begin when the tachometer pulse is detected.
 // By animating `scan_start`, the tunnel appears to revolve.
 volatile uint8_t scan_byte = 0;
 volatile uint8_t scan_mask = 0b10000000;
 volatile uint16_t scan_start = 0;
-volatile bool pulse_flag = false;
+volatile unsigned long pulse_time = 0;
 
+// `pulse_flag` could be function static, but that generates
+// slower code.
+bool pulse_flag = false;
 void fanPulseISR() {
   pulse_flag = !pulse_flag;
   if (pulse_flag) return;
   PixelClock::resync();  // keep the pixel clock aligned with revolutions
   scan_byte = scan_start >> 3;
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
+  pulse_time = micros();
 }
 
 ISR(TIMER2_COMPA_vect) {
@@ -88,33 +93,6 @@ ISR(TIMER2_COMPA_vect) {
     scan_mask = 0b10000000;
     scan_byte = (scan_byte + 1) % sizeof(pattern);
   }
-}
-
-void setup() {
-  Serial.begin(9600);
-  Serial.println(F("Laser Tunnel V1"));
-  Serial.println(F("Adrian McCarthy (a.k.a., Hayward Haunter) 2022"));
-
-  status_pin.begin(LOW);
-  laser_pwm_pin.begin(LOW);
-
-  pinMode(fan_tach_pin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
-
-  fan_pwm_pin.begin(HIGH);
-
-  emergency_stop.begin(INPUT_PULLUP);
-
-  PixelClock::begin();
-  PixelClock::compute(8*sizeof(pattern), 1800);
-}
-
-void loop() {
-  if (emergency_stop.read() == LOW) emergencyStop();
-  delay(16);
-  noInterrupts();
-  scan_start = (scan_start + 1) % (8*sizeof(pattern));
-  interrupts();
 }
 
 [[noreturn]] void emergencyStop() {
@@ -137,4 +115,72 @@ void loop() {
       }
     }
   }
+}
+
+unsigned long measureFanPeriod() {
+  Serial.println("Measuring fan speed...");
+  auto avg_period = 0ul;
+  auto last_pulse_time = micros();
+
+  fan_pwm_pin.set();
+  for (auto samples = 250; samples > 0; ) {
+    if (emergency_stop.read() == LOW) emergencyStop();
+    if (pulse_time) {
+      noInterrupts();
+      const auto period = pulse_time - last_pulse_time;
+      last_pulse_time = pulse_time;
+      pulse_time = 0;
+      interrupts();
+      avg_period = (15*avg_period + period + 8) / 16;
+      --samples;
+      status_pin.toggle();
+    }
+  }
+  fan_pwm_pin.clear();
+  status_pin.clear();
+
+  const auto freq = 1000000ul * 100ul / avg_period;
+  const auto rpm = (60 * freq + 50) / 100;
+  Serial.print(F("  Revolution time: "));
+  Serial.print(avg_period);
+  Serial.println(F(" us (average)"));
+  Serial.print(F("  Speed:           "));
+  Serial.print(rpm);
+  Serial.println(F(" RPM"));
+
+  return avg_period;
+}
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println(F("\nLaser Tunnel V1"));
+  Serial.println(F("Copyright 2022 Adrian McCarthy"));
+  Serial.println(F("https://github.com/aidtopia/laser_tunnel"));
+
+  emergency_stop.begin(INPUT_PULLUP);
+  status_pin.begin(LOW);
+  laser_pwm_pin.begin(LOW);
+
+  fan_pwm_pin.begin(LOW);
+  pinMode(fan_tach_pin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
+
+  const auto fan_period_us = measureFanPeriod();
+  const float pixel_freq = 1.0e6 * pattern_size / fan_period_us;
+  Serial.print("For ");
+  Serial.print(pattern_size);
+  Serial.print(" pixels per revolution, PixelTimer must run at ");
+  Serial.print(pixel_freq);
+  Serial.println(" Hz.");
+
+  PixelClock::begin(pixel_freq);
+  fan_pwm_pin.set();
+}
+
+void loop() {
+  if (emergency_stop.read() == LOW) emergencyStop();
+  delay(16);
+  noInterrupts();
+  scan_start = (scan_start + 1) % (pattern_size);
+  interrupts();
 }
