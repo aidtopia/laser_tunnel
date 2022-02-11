@@ -10,7 +10,7 @@
 
 #include <Arduino.h>
 #include "pins.h"
-#include "pixel_clock.h"
+#include "timers.h"
 
 constexpr auto fan_tach_pin = 2;
 static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
@@ -21,6 +21,7 @@ const auto fan_pwm_pin    = DigitalOutputPin(3);
 const auto laser_pwm_pin  = DigitalOutputPin(4);
 const auto emergency_stop = DigitalInputPin(5);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
+Timer<2> pixel_clock;
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
@@ -78,14 +79,18 @@ bool pulse_flag = false;
 void fanPulseISR() {
   pulse_flag = !pulse_flag;
   if (pulse_flag) return;
-  PixelClock::resync();  // keep the pixel clock aligned with revolutions
+  pixel_clock.resync();  // keep the pixel clock aligned with revolutions
   scan_byte = scan_start >> 3;
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
   pulse_time = micros();
 }
 
 ISR(TIMER2_COMPA_vect) {
-  if (scan_mask & pattern[scan_byte]) laser_pwm_pin.set(); else laser_pwm_pin.clear();
+  if (scan_mask & pattern[scan_byte]) {
+    laser_pwm_pin.set();
+  } else {
+    laser_pwm_pin.clear();
+  }
   
   if (scan_mask != 1) {
     scan_mask >>= 1;
@@ -99,7 +104,7 @@ ISR(TIMER2_COMPA_vect) {
   noInterrupts();
   laser_pwm_pin.clear();
   fan_pwm_pin.clear();
-  PixelClock::stop();  // to ensure laser isn't switched back on
+  pixel_clock.stop();  // to ensure laser isn't switched back on
   interrupts();
   Serial.println("Emergency Stop!");
   Serial.println("Reset the microcontroller to restart.");
@@ -119,11 +124,12 @@ ISR(TIMER2_COMPA_vect) {
 
 unsigned long measureFanPeriod() {
   Serial.println("Measuring fan speed...");
+
   auto avg_period = 0ul;
   auto last_pulse_time = micros();
 
   fan_pwm_pin.set();
-  for (auto samples = 250; samples > 0; ) {
+  for (auto samples = 350; samples > 0; ) {
     if (emergency_stop.read() == LOW) emergencyStop();
     if (pulse_time) {
       noInterrupts();
@@ -173,8 +179,9 @@ void setup() {
   Serial.print(pixel_freq);
   Serial.println(" Hz.");
 
-  PixelClock::begin(pixel_freq);
+  pixel_clock.begin(pixel_freq);
   fan_pwm_pin.set();
+  Serial.println("Initialization complete.");
 }
 
 void loop() {
