@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "LaserTunnel")(type "KiCad")(uri "${KIPRJMOD}/footprints.pretty")(options "")(descr "Project-local footprint library for the Laser Tunnel"))
+)
