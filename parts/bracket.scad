@@ -1,6 +1,8 @@
 // Laser Tunnel -- Fan/Laser bracket
 // Adrian McCarthy 2022
 
+// DEPRECATED:  Use laser_tunnel_3d_kit.scad instead.
+
 // Width of the fan. (mm)
 Fan_Size = 80; // [60, 80, 92, 120, 140, 180]
 
