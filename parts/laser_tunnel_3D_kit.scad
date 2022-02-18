@@ -1,7 +1,7 @@
 // Laser Tunnel
 // Adrian McCarthy 2022
 //
-// Generates the 3D parts necessary for the build.abs
+// Generates the 3D parts necessary for the build.
 
 // Width of the fan. (mm)
 Fan_Size = 80; // [60, 80, 92, 120, 140, 180]
@@ -19,10 +19,16 @@ Laser_Diameter = 6; // [3:0.1:15]
 Laser_Length = 6; // [3:15]
 
 // Distance between the mirror and the laser module. (mm)
-Laser_Distance = 100; // [80:200]
+Laser_Distance = 95; // [90:200]
 
 // Angle by which the laser is offset from the center of the mirror to avoid casting a shadow. (degrees)
 Laser_Angle = 15; // [0:15]
+
+// Thickness of the bracket walls. (mm)
+Thickness = 1.6; // [0.8:0.4:3.0]
+
+// Some dimensions will be optimized according to the diameter of the nozzle on your 3D printer. If unknown, the default (0.4) should be adequate. (mm)
+Nozzle_Diameter = 0.4; // [0.1:0.1:1.0]
 
 module __Customizer_Limit__ () {}
 
@@ -73,12 +79,14 @@ function find_fan_params(size) =
 
 // A simple model of a PC case fan, centered at the origin,
 // with the axis of rotation along the z-axis.
-module fan_model(fan_size=80, fan_d=25.4, envelope=false) {
+module fan_model(fan_size=80, fan_depth=25.4, envelope=false, nozzle_d=0.4) {
+    extra = envelope ? nozzle_d : 0;
     fan_params = find_fan_params(fan_size);
-    fan_w = fan_params[0];
-    fan_h = fan_params[1];
+    fan_w = fan_params[0] + extra;
+    fan_h = fan_params[1] + extra;
     fan_dia = fan_params[2];
     screw_sep = fan_params[3];
+    fan_d = fan_depth + extra;
     hub_dia = 22;
 
     color("gray")
@@ -110,6 +118,31 @@ module fan_model(fan_size=80, fan_d=25.4, envelope=false) {
     }
 }
 
+function find_pcb_params() = [
+    // width, length, thickness
+    75, 75, 1.6,
+    [  // mounting hole locations with sizes
+        [ 4.5, 75 -  5.5, "M3"],
+        [ 4.5, 75 - 50.0, "M3"],
+        [70.5, 75 - 34.0, "M3"]
+    ]
+];
+
+// A simple model of a printed circuit board for the project.
+module pcb_model() {
+    pcb_params = find_pcb_params();
+    w = pcb_params[0];
+    l = pcb_params[1];
+    th = pcb_params[2];
+    mounting_holes = pcb_params[3];
+
+    color("green")
+    difference() {
+        linear_extrude(th) square(w, l);
+        translate([0, 0, th]) bores(mounting_holes, th+1);
+    }
+}
+
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
@@ -130,14 +163,11 @@ module bracket(
     support_full_d = fan_screw_l;
     support_extra_d = support_full_d - support_d;
 
-    pcb_w = 75;
-    pcb_l = 75;
-    pcb_th = 1.6;
-    pcb_mounting_holes = [
-        [ 4.5, pcb_l -  5.5, "M3"],
-        [ 4.5, pcb_l - 50.0, "M3"],
-        [70.5, pcb_l - 34.0, "M3"]
-    ];
+    pcb_params = find_pcb_params();
+    pcb_w = pcb_params[0];
+    pcb_l = pcb_params[1];
+    pcb_th = pcb_params[2];
+    pcb_mounting_holes = pcb_params[3];
     pcb_screw_l = 10;
     elevation = pcb_screw_l - pcb_th;
     
@@ -161,15 +191,6 @@ module bracket(
     module orient_fan() {
         translate([0, support_d/2+support_extra_d, fan_h/2+thickness])
         rotate([90, 0, 0]) children();
-    }
-
-    // A simple model of the printed circuit board for the project.
-    module pcb_model() {
-        color("green")
-        difference() {
-            linear_extrude(pcb_th) square(pcb_w, pcb_l);
-            translate([0, 0, pcb_th]) bores(pcb_mounting_holes, pcb_th+1);
-        }
     }
 
     // Transforms its children just as the pcb_model must be
@@ -267,4 +288,4 @@ bracket(
     fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
     laser_dia=Laser_Diameter, laser_l=Laser_Length,
     distance=Laser_Distance, angle=Laser_Angle,
-    thickness=2);
+    thickness=Thickness, nozzle_d=Nozzle_Diameter);
