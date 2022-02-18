@@ -27,6 +27,21 @@ Laser_Angle = 15; // [0:15]
 // Thickness of the bracket walls. (mm)
 Thickness = 1.6; // [0.8:0.4:3.0]
 
+// The mirror should not be wider than the hub of the fan. (mm)
+Mirror_Diameter = 25.4; // [20:0.2:27]
+
+// The mirror should be thin and light. (mm)
+Mirror_Thickness = 1.75; // [1:0.25:2]
+
+// A larger angle makes a wider cone of light. (degrees)
+Mirror_Angle_1 = 5; // [0:1:15]
+
+// To print a second deflector at the same time, set its angle. (degrees)
+Mirror_Angle_2 = 0; // [0:1:15]
+
+// To print a third deflector at the same time, set its angle. (degrees)
+Mirror_Angle_3 = 0; // [0:1:15]
+
 // Some dimensions will be optimized according to the diameter of the nozzle on your 3D printer. If unknown, the default (0.4) should be adequate. (mm)
 Nozzle_Diameter = 0.4; // [0.1:0.1:1.0]
 
@@ -146,7 +161,7 @@ module pcb_model() {
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
-    thickness=2, nozzle_d=0.4
+    deflector_angle = 0, thickness=2, nozzle_d=0.4
 ) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
@@ -170,7 +185,6 @@ module bracket(
     pcb_mounting_holes = pcb_params[3];
     pcb_screw_l = 10;
     elevation = pcb_screw_l - pcb_th;
-    
     boss_h = elevation - thickness;
 
     fan_plate = [
@@ -263,7 +277,8 @@ module bracket(
             orient_laser() laser_mount();
             orient_pcb() bosses(pcb_mounting_holes, boss_h);
         }
-        orient_pcb() bores(pcb_mounting_holes, elevation+pcb_th, threads="recessed hex nut");
+        orient_pcb() translate([0, 0, pcb_th])
+            bores(pcb_mounting_holes, pcb_screw_l, threads="recessed hex nut");
         
         // Clip the bottom of the laser mount mast left hanging below the
         // base plate.
@@ -281,6 +296,24 @@ module bracket(
     if ($preview) {
         orient_pcb() pcb_model();
         orient_fan() fan_model(fan_size, fan_d);
+        orient_fan() translate([0, 0, fan_d/2]) deflector(deflector_angle, 25.4, 1.75);
+    }
+}
+
+module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4) {
+    h = mirror_d;
+    inner_d = mirror_d + nozzle_d;
+    outer_d = inner_d + 2;
+    box = sqrt(2)*outer_d;
+    intersection() {
+        r = inner_d/2;
+        translate([r, 0, 0]) rotate([0, angle, 0]) translate([-r, 0, 0])
+        difference() {
+            translate([0, 0, mirror_th-h]) cylinder(d=outer_d, h=h);
+            translate([0, 0, 0.1]) cylinder(d=inner_d, h=h);
+        }
+
+        translate([-box/2, -box/2, 0]) cube(box);
     }
 }
 
@@ -288,4 +321,22 @@ bracket(
     fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
     laser_dia=Laser_Diameter, laser_l=Laser_Length,
     distance=Laser_Distance, angle=Laser_Angle,
+    deflector_angle=Mirror_Angle_1,
     thickness=Thickness, nozzle_d=Nozzle_Diameter);
+
+
+translate([-(Fan_Size/2 + 3*Thickness + Mirror_Diameter/2), 0, 0]) {
+    if (Mirror_Angle_1 != 0) {
+        deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+    }
+
+    if (Mirror_Angle_2 != 0) {
+        translate([0, -(1.2 * Mirror_Diameter), 0])
+        deflector(Mirror_Angle_2, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+    }
+
+    if (Mirror_Angle_3 != 0) {
+        translate([0, -2*(1.2*Mirror_Diameter), 0])
+        deflector(Mirror_Angle_3, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+    }
+}
