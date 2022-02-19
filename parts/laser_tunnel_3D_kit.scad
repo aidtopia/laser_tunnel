@@ -180,6 +180,26 @@ module pcb_model() {
     }
 }
 
+module branding() {
+    font = "Liberation Sans:style=Bold Italic";
+    scale([1/130, 1/16, 1])
+        linear_extrude(1)
+            text("Laser Tunnel V1", size=12, font=font,
+                 halign="center", valign="center");
+}
+
+module credits() {
+    font = "Liberation Sans";
+    scale([1/183, 1/32, 1])
+        linear_extrude(1) {
+            text("Designed for Norcal Haunters", size=10, font=font,
+                 halign="center", valign="baseline");
+            translate([0, -15, 0])
+            text("by Adrian McCarthy 2022", size=10.5, font=font,
+                 halign="center", valign="baseline");
+        }
+}
+
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
@@ -248,6 +268,7 @@ module bracket(
     
     module fan_support() {
         h = max(10, 0.15*fan_h);
+
         intersection() {
             difference() {
                 cube([2*fan_w, 2*fan_h, 2*fan_d], center=true);
@@ -259,6 +280,8 @@ module bracket(
                     translate([screw_offset, 0, 0]) rotate([180, 0, 0])
                         bolt_hole(fan_screw, fan_screw_l, "recessed hex nut");
                 }
+                translate([-(fan_w+thickness)/2, (support_h-fan_h)/2, support_extra_d/2]) rotate([0, -90, 0]) scale([support_full_d, support_h, thickness]) branding();
+                translate([(fan_w+thickness)/2, (support_h-fan_h)/2, support_extra_d/2]) rotate([0, 90, 0]) scale([support_full_d, support_h, thickness]) credits();
             }
             translate([0, (support_h-fan_h)/2, support_extra_d/2])
                 cube([support_w, support_h, support_full_d], center=true);
@@ -296,55 +319,16 @@ module bracket(
                         children();
     }
     
-    module branding() {
-        regular_font = "Liberation Sans";
-        caption_font = "Liberation Sans:style=Bold Italic";
-        factor = min(support_full_d/137, support_h/37);
-        translate([(thickness-support_w)/2, -fan_h/2, -fan_d/2])
-        rotate([0, -90, 0])
-        scale([factor, factor, 1])
-        linear_extrude(thickness) {
-            translate([0, 11, 0]) {
-            translate([0, 11, 0]) {
-            text("Laser Tunnel V1", size=12, font=caption_font);
-            }
-            text("Designed for Norcal Haunters", size=7, font=regular_font);
-        }
-            text("by Adrian McCarthy 2022", size=8.2, font=regular_font);
-        }
-    }
-    
-    module alt_branding() {
-        regular_font = "Liberation Sans";
-        caption_font = "Liberation Sans:style=Bold Italic";
-        factor = min(support_full_d/137, support_h/37);
-        translate([-(thickness-support_w)/2, -fan_h/2, fan_d/2 + support_extra_d])
-        rotate([0, 90, 0])
-        scale([factor, factor, 1])
-        linear_extrude(thickness) {
-            translate([0, 11, 0]) {
-            translate([0, 11, 0]) {
-            text("Laser Tunnel V1", size=12, font=caption_font);
-            }
-            text("Designed for Norcal Haunters", size=7, font=regular_font);
-        }
-            text("by Adrian McCarthy 2022", size=8.2, font=regular_font);
-        }
-    }
-
     difference() {
         union() {
             base_plate();
-            orient_fan() {
-                fan_support();
-                branding();
-            }
+            orient_fan() fan_support();
             orient_laser() laser_mount();
             orient_pcb() bosses(pcb_mounting_holes, boss_h);
         }
         orient_pcb() translate([0, 0, pcb_th])
             bores(pcb_mounting_holes, pcb_screw_l, threads="recessed hex nut");
-        orient_fan() alt_branding();
+        orient_fan() credits();
 
         // Clip the bottom of the laser mount mast left hanging below the
         // base plate.
