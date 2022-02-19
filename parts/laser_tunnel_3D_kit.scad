@@ -161,7 +161,7 @@ module pcb_model() {
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
-    deflector_angle = 0, thickness=2, nozzle_d=0.4
+    thickness=2, nozzle_d=0.4
 ) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
@@ -300,7 +300,6 @@ module bracket(
     if ($preview) {
         orient_pcb() pcb_model();
         orient_fan() fan_model(fan_size, fan_d);
-        orient_fan() translate([0, 0, fan_d/2]) deflector(deflector_angle, 25.4, 1.75);
     }
 }
 
@@ -325,7 +324,6 @@ bracket(
     fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
     laser_dia=Laser_Diameter, laser_l=Laser_Length,
     distance=Laser_Distance, angle=Laser_Angle,
-    deflector_angle=Mirror_Angle_1,
     thickness=Thickness, nozzle_d=Nozzle_Diameter);
 
 
