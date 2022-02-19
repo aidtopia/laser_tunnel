@@ -94,7 +94,7 @@ function find_fan_params(size) =
 
 // A simple model of a PC case fan, centered at the origin,
 // with the axis of rotation along the z-axis.
-module fan_model(fan_size=80, fan_depth=25.4, envelope=false, nozzle_d=0.4) {
+module fan_model(fan_size=80, fan_depth=25.4, envelope=false, rpm=0, nozzle_d=0.4) {
     extra = envelope ? nozzle_d : 0;
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0] + extra;
@@ -102,34 +102,56 @@ module fan_model(fan_size=80, fan_depth=25.4, envelope=false, nozzle_d=0.4) {
     fan_dia = fan_params[2];
     screw_sep = fan_params[3];
     fan_d = fan_depth + extra;
-    hub_dia = 22;
+    hub_dia = max(22, fan_size/4);
+    
+    module hub() {
+        cylinder(h=fan_d, d=hub_dia, center=true);
+    }
+    
+    module blades() {
+        count = floor(fan_size*7/80);
+        d = fan_d - 1;
+        l = fan_dia/2 - 2;
+        rotate([90, 0, 0])
+        for (i=[1:count])
+          rotate([0, i*360/count, 0])
+            linear_extrude(l, twist=50) square([1, d], center=true);
+    }
 
-    color("gray")
-    udi(envelope ? "u" : "d") {
-        cube([fan_w, fan_h, fan_d], center=true);
+    module body() {
         udi(envelope ? "u" : "d") {
+            cube([fan_w, fan_h, fan_d], center=true);
             cylinder(h=2*fan_d+10, d=fan_dia, center=true);
-            cylinder(h=2*fan_d+12, d=hub_dia, center=true);
-        }
-        if (!envelope) {
-            screw_offset = screw_sep/2;
-            translate([0, -screw_offset, 0]) {
-                translate([-screw_offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-                translate([screw_offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-            }
-            translate([0, screw_offset, 0]) {
-                translate([-screw_offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
-                translate([screw_offset, 0, 0])
-                    cylinder(h=fan_d+10, d=4.3, center=true);
+            if (!envelope) {
+                screw_offset = screw_sep/2;
+                translate([0, -screw_offset, 0]) {
+                    translate([-screw_offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                    translate([screw_offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                }
+                translate([0, screw_offset, 0]) {
+                    translate([-screw_offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                    translate([screw_offset, 0, 0])
+                        cylinder(h=fan_d+10, d=4.3, center=true);
+                }
             }
         }
     }
-    if ($preview) {
-        // Make the front (air intake) distinguishable from the back.
-        color("white") translate([0, 0, fan_d/2+1.1]) sphere(d=hub_dia/4);
+
+    color("gray") body();
+    if (!envelope) {
+        rotate([0, 0, rpm/60*$t/30*360]) {
+            color("gray") {
+                hub();
+                blades();
+            }
+            if ($preview) {
+                // Make the front (air intake) distinguishable from the back.
+                color("white") translate([0, 0, fan_d/2+1.1]) sphere(d=hub_dia/4);
+            }
+        }
     }
 }
 
@@ -339,7 +361,7 @@ module bracket(
     // Preview mode shows the kit in the context of some non-printed parts.
     if ($preview) {
         orient_pcb() pcb_model();
-        orient_fan() fan_model(fan_size, fan_d);
+        orient_fan() fan_model(fan_size, fan_d, rpm=1800);
     }
 }
 
