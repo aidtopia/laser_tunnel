@@ -273,17 +273,57 @@ module bracket(
                     translate([0, 0, distance])
                         children();
     }
+    
+    module branding() {
+        regular_font = "Liberation Sans";
+        caption_font = "Liberation Sans:style=Bold Italic";
+        factor = min(support_full_d/137, support_h/37);
+        translate([(thickness-support_w)/2, -fan_h/2, -fan_d/2])
+        rotate([0, -90, 0])
+        scale([factor, factor, 1])
+        linear_extrude(thickness) {
+            translate([0, 11, 0]) {
+            translate([0, 11, 0]) {
+            text("Laser Tunnel V1", size=12, font=caption_font);
+            }
+            text("Designed for Norcal Haunters", size=7, font=regular_font);
+        }
+            text("by Adrian McCarthy 2022", size=8.2, font=regular_font);
+        }
+    }
+    
+    module alt_branding() {
+        regular_font = "Liberation Sans";
+        caption_font = "Liberation Sans:style=Bold Italic";
+        factor = min(support_full_d/137, support_h/37);
+        translate([-(thickness-support_w)/2, -fan_h/2, fan_d/2 + support_extra_d])
+        rotate([0, 90, 0])
+        scale([factor, factor, 1])
+        linear_extrude(thickness) {
+            translate([0, 11, 0]) {
+            translate([0, 11, 0]) {
+            text("Laser Tunnel V1", size=12, font=caption_font);
+            }
+            text("Designed for Norcal Haunters", size=7, font=regular_font);
+        }
+            text("by Adrian McCarthy 2022", size=8.2, font=regular_font);
+        }
+    }
 
     difference() {
         union() {
             base_plate();
-            orient_fan() fan_support();
+            orient_fan() {
+                fan_support();
+                branding();
+            }
             orient_laser() laser_mount();
             orient_pcb() bosses(pcb_mounting_holes, boss_h);
         }
         orient_pcb() translate([0, 0, pcb_th])
             bores(pcb_mounting_holes, pcb_screw_l, threads="recessed hex nut");
-        
+        orient_fan() alt_branding();
+
         // Clip the bottom of the laser mount mast left hanging below the
         // base plate.
         translate([0, 0, -500]) cube(1000, center=true);
