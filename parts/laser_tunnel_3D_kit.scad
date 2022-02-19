@@ -244,8 +244,7 @@ module bracket(
     }
 
     module laser_beam(distance) {
-        d = distance + fan_d/2;
-        translate([0, 0, -d]) cylinder(h=d, d=laser_dia/4);
+        translate([0, 0, -distance]) cylinder(h=distance, d=laser_dia/4);
     }
     
     module laser_mount() {
