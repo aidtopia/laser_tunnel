@@ -244,7 +244,8 @@ module bracket(
     }
 
     module laser_beam(distance) {
-        translate([0, 0, -distance]) cylinder(h=distance, d=laser_dia/4);
+        d = distance + fan_d/2;
+        translate([0, 0, -d]) cylinder(h=d, d=laser_dia/4);
     }
     
     module laser_mount() {
@@ -267,7 +268,11 @@ module bracket(
     }
     
     module orient_laser() {
-        orient_fan() rotate([angle, 0, 0]) translate([0, 0, distance+fan_d/2]) children();
+        orient_fan()
+            translate([0, 0, fan_d/2])
+                rotate([angle, 0, 0])
+                    translate([0, 0, distance])
+                        children();
     }
 
     difference() {
