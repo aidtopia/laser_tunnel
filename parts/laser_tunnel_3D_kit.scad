@@ -28,7 +28,7 @@ Laser_Angle = 15; // [0:15]
 PCB_Screws = "M3"; // [M3, #4-40]
 
 // Thickness of the bracket walls. (mm)
-Thickness = 1.6; // [0.8:0.4:3.0]
+Thickness = 1.6; // [1.2:0.4:3.2]
 
 // The mirror should not be wider than the hub of the fan. (mm)
 Mirror_Diameter = 25.4; // [20:0.2:27]
@@ -275,15 +275,23 @@ module bracket(
     module fan_support() {
         h = max(10, 0.15*fan_h);
 
+        // Normally, we'd want the recesses for the nuts to have corners at
+        // the top since a sloped peak prints better without support than a
+        // flat span.  But the #6 nuts are wider than the M4 ones and their
+        // bottom corners would cut into the base plate.  So we rotate
+        // those to make the wide dimension horizontal, and hope for the
+        // best printing the flat span.
+        nutrot = fan_screw[0] == "#" ? 90 : 0;
+
         intersection() {
             difference() {
                 cube([2*fan_w, 2*fan_h, 2*fan_d], center=true);
                 fan_model(fan_size, fan_d, envelope=true, $fn=64);
                 screw_offset = screw_sep/2;
                 translate([0, -screw_offset, -(fan_screw_l - support_extra_d)/2]) {
-                    translate([-screw_offset, 0, 0]) rotate([180, 0, 0])
+                    translate([-screw_offset, 0, 0]) rotate([180, 0, nutrot])
                         bolt_hole(fan_screw, fan_screw_l, "recessed hex nut");
-                    translate([screw_offset, 0, 0]) rotate([180, 0, 0])
+                    translate([screw_offset, 0, 0]) rotate([180, 0, nutrot])
                         bolt_hole(fan_screw, fan_screw_l, "recessed hex nut");
                 }
                 translate([-(fan_w+thickness)/2, (support_h-fan_h)/2, support_extra_d/2]) rotate([0, -90, 0]) scale([support_full_d, support_h, thickness]) branding();
