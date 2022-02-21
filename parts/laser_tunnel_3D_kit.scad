@@ -24,6 +24,9 @@ Laser_Distance = 95; // [90:200]
 // Angle by which the laser is offset from the center of the mirror to avoid casting a shadow. (degrees)
 Laser_Angle = 15; // [0:15]
 
+// Screws used to mount the printed circuit board are typically M3, but you can choose #4-40 if metric screws aren't available. Check OpenSCAD's console output for the proper screw length.
+PCB_Screws = "M3"; // [M3, #4-40]
+
 // Thickness of the bracket walls. (mm)
 Thickness = 1.6; // [0.8:0.4:3.0]
 
@@ -203,7 +206,7 @@ module credits() {
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
-    thickness=2, nozzle_d=0.4
+    pcb_screw="M3", thickness=2, nozzle_d=0.4
 ) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
@@ -215,8 +218,8 @@ module bracket(
     support_w = fan_w + 2*thickness;
     support_d = fan_d + 2*thickness;
     // Add some extra depth for pocket nuts.
-    echo(str("Fan screws should be ", fan_screw_l, " mm long"));
     fan_screw_l = round_up(support_d + 5, 5);
+    echo(str("Fan screws should be ", screw_to_string(fan_screw, fan_screw_l)));
     support_full_d = fan_screw_l;
     support_extra_d = support_full_d - support_d;
 
@@ -225,9 +228,12 @@ module bracket(
     pcb_l = pcb_params[1];
     pcb_th = pcb_params[2];
     pcb_mounting_holes = pcb_params[3];
-    pcb_screw_l = 10;
+    pcb_screw_l = pcb_screw[0] == "M" ? 10 : 12.5;
     elevation = pcb_screw_l - pcb_th;
+    echo(str("PCB screws should be ", screw_to_string(pcb_screw, pcb_screw_l)));
     boss_h = elevation - thickness;
+    
+    posts = set_radii(pcb_mounting_holes, pcb_screw);
 
     fan_plate = [
         [ support_w/2, support_full_d],
@@ -324,10 +330,10 @@ module bracket(
             base_plate();
             orient_fan() fan_support();
             orient_laser() laser_mount();
-            orient_pcb() bosses(pcb_mounting_holes, boss_h);
+            orient_pcb() bosses(posts, boss_h);
         }
         orient_pcb() translate([0, 0, pcb_th])
-            bores(pcb_mounting_holes, pcb_screw_l, threads="recessed hex nut");
+            bores(posts, pcb_screw_l, threads="recessed hex nut");
         orient_fan() credits();
 
         // Clip the bottom of the laser mount mast left hanging below the
@@ -370,7 +376,8 @@ bracket(
     fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
     laser_dia=Laser_Diameter, laser_l=Laser_Length,
     distance=Laser_Distance, angle=Laser_Angle,
-    thickness=Thickness, nozzle_d=Nozzle_Diameter);
+    pcb_screw=PCB_Screws, thickness=Thickness,
+    nozzle_d=Nozzle_Diameter);
 
 
 translate([-(Fan_Size/2 + 3*Thickness + Mirror_Diameter/2), 0, 0]) {
