@@ -168,6 +168,9 @@ function find_pcb_params() = [
         [ 4.5, 75 -  5.5, "M3"],
         [ 4.5, 75 - 50.0, "M3"],
         [70.5, 75 - 34.0, "M3"]
+    ],
+    [  // additional points for support--no screws
+        [45,   75 - 65.0, 5],
     ]
 ];
 
@@ -232,11 +235,13 @@ module bracket(
     pcb_l = pcb_params[1];
     pcb_th = pcb_params[2];
     pcb_mounting_holes = pcb_params[3];
+    pcb_support_points = pcb_params[4];
     pcb_screw_l = pcb_screw[0] == "M" ? 10 : 12.5;
     elevation = pcb_screw_l - pcb_th;
     echo(str("PCB screws should be ", screw_to_string(pcb_screw, pcb_screw_l)));
     boss_h = elevation - thickness;
     posts = set_radii(pcb_mounting_holes, pcb_screw);
+    extra_posts = pcb_support_points;
 
     use_anchors = anchor_screw != "none";
     anchor_d = use_anchors ? boss_diameters(anchor_screw)[0] : 0;
@@ -385,12 +390,18 @@ module bracket(
                 base_plate();
                 orient_fan() fan_support();
                 orient_laser() laser_mount();
-                orient_pcb() bosses(posts, boss_h);
+                orient_pcb() {
+                    bosses(posts, boss_h);
+                    bosses(extra_posts, boss_h);
+                }
                 orient_anchors() bosses(anchors, anchor_h);
             }
 
             orient_pcb() translate([0, 0, pcb_th])
                 bores(posts, pcb_screw_l, threads="recessed hex nut");
+            
+            // The extra_posts are just for support and do not need to
+            // be bored.
 
             orient_anchors()
                 bores(anchors, 25.4, threads="none", head="flat");
@@ -440,7 +451,7 @@ bracket(
     thickness=Thickness, nozzle_d=Nozzle_Diameter);
 
 
-translate([-(Fan_Size/2 + 3*Thickness + Mirror_Diameter/2), 0, 0]) {
+translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
     if (Mirror_Angle_1 != 0) {
         deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
     }
