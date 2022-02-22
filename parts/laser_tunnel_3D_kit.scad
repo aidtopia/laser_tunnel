@@ -245,7 +245,7 @@ module bracket(
 
     use_anchors = anchor_screw != "none";
     anchor_d = use_anchors ? boss_diameters(anchor_screw)[0] : 0;
-    anchor_h = thou(100);  // TBD
+    anchor_h = use_anchors ? bolt_head_height(anchor_screw, "flat") : 0;
 
     x_support = support_w/2;
     y0_support = 0;
