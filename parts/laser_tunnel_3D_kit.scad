@@ -246,6 +246,10 @@ module bracket(
     use_anchors = anchor_screw != "none";
     anchor_d = use_anchors ? boss_diameters(anchor_screw)[0] : 0;
     anchor_h = use_anchors ? bolt_head_height(anchor_screw, "flat") : 0;
+    if (use_anchors) {
+        echo(str("Anchor screws should be ", anchor_screw,
+                 " with flat heads."));
+    }
 
     x_support = support_w/2;
     y0_support = 0;
