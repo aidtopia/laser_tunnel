@@ -27,6 +27,9 @@ Laser_Angle = 15; // [0:15]
 // Screws used to mount the printed circuit board are typically M3, but you can choose #4-40 if metric screws aren't available. Check OpenSCAD's console output for the proper screw length.
 PCB_Screws = "M3"; // [M3, #4-40]
 
+// Optional flat-head screws used to anchor the bracket to a surface.
+Anchor_Screws = "none"; // [none, #6-32, #8-32]
+
 // Thickness of the bracket walls. (mm)
 Thickness = 1.6; // [1.2:0.4:3.2]
 
@@ -70,10 +73,10 @@ module bosses(locations, boss_h) {
     }
 }
 
-module bores(locations, depth, threads="none") {
+module bores(locations, depth, threads="none", head="pan") {
     for (l = locations) {
         translate([l.x, l.y, 0])
-            bolt_hole(l[2], depth, threads=threads);
+            bolt_hole(l[2], depth, threads=threads, head=head);
     }
 }
 
@@ -206,7 +209,8 @@ module credits() {
 module bracket(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
-    pcb_screw="M3", thickness=2, nozzle_d=0.4
+    pcb_screw="M3", anchor_screw="#6-32", thickness=2,
+    nozzle_d=0.4
 ) {
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0];
@@ -232,21 +236,37 @@ module bracket(
     elevation = pcb_screw_l - pcb_th;
     echo(str("PCB screws should be ", screw_to_string(pcb_screw, pcb_screw_l)));
     boss_h = elevation - thickness;
-    
     posts = set_radii(pcb_mounting_holes, pcb_screw);
 
-    fan_plate = [
-        [ support_w/2, support_full_d],
-        [ support_w/2, 0],
-    ];
+    use_anchors = anchor_screw != "none";
+    anchor_d = use_anchors ? boss_diameters(anchor_screw)[0] : 0;
+    anchor_h = thou(100);  // TBD
 
-    pcb_plate = [
-        [ pcb_w/2, 0, (fan_plate[0].x - pcb_w/2)/2],
-        [ pcb_w/2, -(pcb_l+2*thickness)],
-    ];
+    x_support = support_w/2;
+    y0_support = 0;
+    y1_support = y0_support + support_full_d;
+    x_fanchor = 0;
+    y_fanchor = y1_support + anchor_d;
     
-    mast_point = [0, -distance*cos(angle), laser_l+thickness];
+    x_pcb = pcb_w/2;
+    y1_pcb = y0_support;
+    y0_pcb = y1_pcb - thickness - pcb_l - thickness;
 
+    x_lanchor = x_pcb/2 + thickness;
+    y_lanchor = y0_pcb - 2*thickness - anchor_d/2;
+
+    x_laser = 0;
+    y_laser = y0_support - distance*cos(angle);
+
+    anchors = use_anchors ?
+        set_radii(
+        [
+            [ x_fanchor, y_fanchor - anchor_d/2],
+            [ x_lanchor, y_lanchor + anchor_d/2],
+            [-x_lanchor, y_lanchor + anchor_d/2]
+        ], anchor_screw) :
+        [];
+    
     // Transforms its children just as the fan_model must be
     // transformed to put it into its position relative to
     // the bracket.
@@ -265,11 +285,33 @@ module bracket(
         children();
     }
 
+    module footprint() {
+        core_points = [
+            [ x_support,    y1_support                          ],
+            [ x_support,    y0_support                          ],
+            [ x_pcb,        y1_pcb,     (x_support - x_pcb)/2   ],
+            [ x_pcb,        y0_pcb,     thickness               ],
+        ];
+        all_points = use_anchors ? [
+            [ x_fanchor,    y_fanchor,  anchor_d/2              ],
+            each core_points,
+            [ x_lanchor + anchor_d/4,    y_lanchor,  anchor_d/2              ],
+            [ x_laser,      y_laser,    laser_l+thickness       ]
+        ] : [
+            each core_points,
+            [ x_laser,      y_laser,    laser_l+thickness       ]
+        ];
+        path = mirror_path(all_points);
+
+        polygon(rounded_polygon(path));
+    }
+
     module base_plate() {
-        corners = rounded_polygon(mirror_path([
-            each fan_plate, each pcb_plate, mast_point
-        ]));
-        linear_extrude(thickness) polygon(corners);
+        linear_extrude(thickness) footprint();
+
+        // Add a rib to resist warping.
+        translate([0, 0, thickness]) rotate([90, 0, 0])
+            cylinder(h=abs(y0_pcb), r=thickness, $fn=10);
     }
     
     module fan_support() {
@@ -333,27 +375,37 @@ module bracket(
                         children();
     }
     
-    difference() {
-        union() {
-            base_plate();
-            orient_fan() fan_support();
-            orient_laser() laser_mount();
-            orient_pcb() bosses(posts, boss_h);
-        }
-        orient_pcb() translate([0, 0, pcb_th])
-            bores(posts, pcb_screw_l, threads="recessed hex nut");
-        orient_fan() credits();
+    module orient_anchors() {
+        translate([0, 0, anchor_h]) children();
+    }
+    
+    intersection() {
+        difference() {
+            union() {
+                base_plate();
+                orient_fan() fan_support();
+                orient_laser() laser_mount();
+                orient_pcb() bosses(posts, boss_h);
+                orient_anchors() bosses(anchors, anchor_h);
+            }
 
-        // Clip the bottom of the laser mount mast left hanging below the
-        // base plate.
-        translate([0, 0, -500]) cube(1000, center=true);
+            orient_pcb() translate([0, 0, pcb_th])
+                bores(posts, pcb_screw_l, threads="recessed hex nut");
+
+            orient_anchors()
+                bores(anchors, 25.4, threads="none", head="flat");
+
+            // Allow the QR code on the PCB to show through the bottom.
+            orient_pcb() translate([0, 0, -(elevation+1)])
+                linear_extrude(elevation+2)
+                    polygon(rounded_polygon(set_radii([
+                        [12.5, 3], [12.5, 21], [28.5, 21], [28.5, 3]
+                    ], thickness)));
+        }
         
-        // Allow the QR code on the PCB to show through the bottom.
-        orient_pcb() translate([0, 0, -(elevation+1)])
-            linear_extrude(elevation+2)
-                polygon(rounded_polygon(set_radii([
-                    [12.5, 3], [12.5, 21], [28.5, 21], [28.5, 3]
-                ], thickness)));
+        // The construction process above leaves a few bits that need to
+        // be scraped off.
+        linear_extrude(100) footprint();
     }
 
     // Preview mode shows the kit in the context of some non-printed parts.
@@ -384,8 +436,8 @@ bracket(
     fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
     laser_dia=Laser_Diameter, laser_l=Laser_Length,
     distance=Laser_Distance, angle=Laser_Angle,
-    pcb_screw=PCB_Screws, thickness=Thickness,
-    nozzle_d=Nozzle_Diameter);
+    pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
+    thickness=Thickness, nozzle_d=Nozzle_Diameter);
 
 
 translate([-(Fan_Size/2 + 3*Thickness + Mirror_Diameter/2), 0, 0]) {
