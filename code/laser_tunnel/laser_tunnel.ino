@@ -9,14 +9,11 @@
 // be portable to any 5V/16 MHz AVR processor.
 
 #include <Arduino.h>
+#include "aidassert.h"
 #include "pins.h"
 #include "timers.h"
 
-constexpr auto fan_tach_pin = 2;
-static_assert(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT,
-              "The tachometer output from the fan must be connected "
-              "to a pin that can generate external interrupts.");
-
+const auto fan_tach_pin = DigitalInputPin(2);
 const auto fan_pwm_pin    = DigitalOutputPin(3);
 const auto laser_pwm_pin  = DigitalOutputPin(4);
 const auto emergency_stop = DigitalInputPin(5);
@@ -162,6 +159,10 @@ void setup() {
   Serial.println(F("\nLaser Tunnel V1"));
   Serial.println(F("Copyright 2022 Adrian McCarthy"));
   Serial.println(F("https://github.com/aidtopia/laser_tunnel"));
+
+  // The tachometer output from the fan must be connected
+  // to a pin that can generate external interrupts.
+  ASSERT(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT);
 
   emergency_stop.begin(INPUT_PULLUP);
   status_pin.begin(LOW);
