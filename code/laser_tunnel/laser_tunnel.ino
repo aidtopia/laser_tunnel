@@ -13,12 +13,35 @@
 #include "pins.h"
 #include "timers.h"
 
-const auto fan_tach_pin = DigitalInputPin(2);
+// MCU Resources
+const auto fan_tach_pin   = DigitalInputPin(2);
 const auto fan_pwm_pin    = DigitalOutputPin(3);
 const auto laser_pwm_pin  = DigitalOutputPin(4);
 const auto emergency_stop = DigitalInputPin(5);
+const auto suppress_high  = DigitalInputPin(6);
+const auto suppress_low   = DigitalInputPin(7);
+const auto trigger_high   = DigitalInputPin(8);
+const auto trigger_low    = DigitalInputPin(9);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
+const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
+const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
+
 Timer<2> pixel_clock;
+
+enum class State {
+  Initializing,
+  Calibrating,
+  Idle,         // waiting for a trigger
+  Running,      // effect animation in progress
+  Stopped       // we're in the emergency stop
+} state = State::Initializing;
+
+// Suppress is not part of the state machine.  When supressed,
+// the laser is disabled until the suppress signal has been LOW
+// for the suppress time.
+
+// Issuing fog is also not part of the state machine, but part
+// of the animation sequence.
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
@@ -103,6 +126,9 @@ ISR(TIMER2_COMPA_vect) {
   fan_pwm_pin.clear();
   pixel_clock.stop();  // to ensure laser isn't switched back on
   interrupts();
+  fog_pin.clear();
+  house_lights_pin.set();
+
   Serial.println("Emergency Stop!");
   Serial.println("Reset the microcontroller to restart.");
   for (;;) {
@@ -121,12 +147,11 @@ ISR(TIMER2_COMPA_vect) {
 
 unsigned long measureFanPeriod() {
   Serial.println("Measuring fan speed...");
-
   auto avg_period = 0ul;
-  auto last_pulse_time = micros();
 
+  auto last_pulse_time = micros();
   fan_pwm_pin.set();
-  for (auto samples = 350; samples > 0; ) {
+  for (auto samples = 250; samples > 0; ) {
     if (emergency_stop.read() == LOW) emergencyStop();
     if (pulse_time) {
       noInterrupts();
@@ -164,13 +189,21 @@ void setup() {
   // to a pin that can generate external interrupts.
   ASSERT(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT);
 
-  emergency_stop.begin(INPUT_PULLUP);
+  // Initial outputs
   status_pin.begin(LOW);
   laser_pwm_pin.begin(LOW);
-
+  fog_pin.begin(LOW);
+  house_lights_pin.begin(LOW);
   fan_pwm_pin.begin(LOW);
+
+  // Set up the inputs
+  emergency_stop.begin(INPUT_PULLUP);
   pinMode(fan_tach_pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
+  suppress_high.begin();
+  suppress_low.begin(INPUT_PULLUP);
+  trigger_high.begin();
+  trigger_low.begin(INPUT_PULLUP);
 
   const auto fan_period_us = measureFanPeriod();
   const float pixel_freq = 1.0e6 * pattern_size / fan_period_us;
@@ -183,12 +216,27 @@ void setup() {
   pixel_clock.begin(pixel_freq);
   fan_pwm_pin.set();
   Serial.println("Initialization complete.");
+  state = State::Idle;
 }
 
 void loop() {
   if (emergency_stop.read() == LOW) emergencyStop();
-  delay(16);
-  noInterrupts();
-  scan_start = (scan_start + 1) % (pattern_size);
-  interrupts();
+  switch (state) {
+    case State::Idle:
+      if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
+        state = State::Running;
+      }
+      break;
+    case State::Running:
+      delay(16);
+      noInterrupts();
+      scan_start = (scan_start + 1) % (pattern_size);
+      interrupts();
+      break;
+    default:
+      Serial.print(F("Laser Tunnel in unexpected state: "));
+      Serial.println(static_cast<int>(state));
+      emergencyStop();
+      break;
+  }
 }
