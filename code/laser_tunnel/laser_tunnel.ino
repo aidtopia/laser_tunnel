@@ -10,13 +10,14 @@
 
 #include <Arduino.h>
 #include "aidassert.h"
+#include "laser.h"
 #include "pins.h"
 #include "timers.h"
 
 // MCU Resources
 const auto fan_tach_pin   = DigitalInputPin(2);
 const auto fan_pwm_pin    = DigitalOutputPin(3);
-const auto laser_pwm_pin  = DigitalOutputPin(4);
+auto laser = Laser(4);
 const auto emergency_stop = DigitalInputPin(5);
 const auto suppress_high  = DigitalInputPin(6);
 const auto suppress_low   = DigitalInputPin(7);
@@ -25,6 +26,8 @@ const auto trigger_low    = DigitalInputPin(9);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
 const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
+const auto effect_time_pin = A3;
+const auto suppress_time_pin = A2;
 
 Timer<2> pixel_clock;
 
@@ -39,6 +42,8 @@ enum class State {
 // Suppress is not part of the state machine.  When supressed,
 // the laser is disabled until the suppress signal has been LOW
 // for the suppress time.
+bool suppressed = false;
+unsigned long suppress_until = 0uL;
 
 // Issuing fog is also not part of the state machine, but part
 // of the animation sequence.
@@ -107,9 +112,9 @@ void fanPulseISR() {
 
 ISR(TIMER2_COMPA_vect) {
   if (scan_mask & pattern[scan_byte]) {
-    laser_pwm_pin.set();
+    laser.on();
   } else {
-    laser_pwm_pin.clear();
+    laser.off();
   }
   
   if (scan_mask != 1) {
@@ -122,9 +127,9 @@ ISR(TIMER2_COMPA_vect) {
 
 [[noreturn]] void emergencyStop() {
   noInterrupts();
-  laser_pwm_pin.clear();
+  laser.disable();
   fan_pwm_pin.clear();
-  pixel_clock.stop();  // to ensure laser isn't switched back on
+  pixel_clock.stop();
   interrupts();
   fog_pin.clear();
   house_lights_pin.set();
@@ -179,6 +184,45 @@ unsigned long measureFanPeriod() {
   return avg_period;
 }
 
+void beginEffect() {
+  Serial.println(F("Triggered."));
+  fog_pin.set();
+  state = State::Running;
+}
+
+void suppress() {
+  if (!suppressed) {
+    Serial.println(F("Suppressing!"));
+    laser.disable();
+    suppressed = true;
+
+    // temp for debugging
+    const auto setting = analogRead(suppress_time_pin);
+    const auto duration =
+      map(setting, 1023, 0, 1000, 60000);
+    Serial.print(F("Suppress Time: "));
+    Serial.print(setting);
+    Serial.print(F(" = "));
+    Serial.print(duration);
+    Serial.println(F(" ms"));
+    
+  }
+  // We keep updating suppress_until as long as a suppress sensor
+  // is activated.  Effectively, the suppress time applies once
+  // the sensor is deactivated.
+  const auto duration =
+    map(analogRead(suppress_time_pin), 1023, 0, 1000, 60000);
+  suppress_until = millis() + duration;
+}
+
+void unsuppress() {
+  if (suppressed) {
+    Serial.println(F("Suppress time has elapsed."));
+    laser.enable();
+    suppressed = false;
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println(F("\nLaser Tunnel V1"));
@@ -191,7 +235,7 @@ void setup() {
 
   // Initial outputs
   status_pin.begin(LOW);
-  laser_pwm_pin.begin(LOW);
+  laser.begin();
   fog_pin.begin(LOW);
   house_lights_pin.begin(LOW);
   fan_pwm_pin.begin(LOW);
@@ -221,10 +265,17 @@ void setup() {
 
 void loop() {
   if (emergency_stop.read() == LOW) emergencyStop();
+
+  if (suppress_high.read() == HIGH || suppress_low.read() == LOW) {
+    suppress();
+  } else if (suppressed && millis() > suppress_until) {
+    unsuppress();
+  }
+  
   switch (state) {
     case State::Idle:
       if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
-        state = State::Running;
+        beginEffect();
       }
       break;
     case State::Running:
