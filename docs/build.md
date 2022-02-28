@@ -1,15 +1,13 @@
 # Laser Tunnel
 
 Adrian McCarthy (a.k.a. Hayward Haunter)<br>
-January 2022
+January-March 2022
 
 INCOMPLETE ROUGH DRAFT
 
 ## Description
 
-By aiming a laser at a spinning mirror in a foggy or hazy environment, you can create a tunnel of light to transport your haunt visitors to an other worldly place.  We’re going to take it a step farther than other laser tunnels you may have seen.  By carefully timing the laser pulses to the motor, we can make the tunnel as disorienting as a physical rotating tunnel.  Furthermore, this design should be safer than other DIY laser tunnels you may have seen online.
-
-http://www.ecfr.gov/graphics/er01fe93.031.gif
+By aiming a laser at a spinning mirror in a foggy or hazy environment, you can create a tunnel of light to transport your haunt visitors to an other worldly place.  We’re going to take it a step further than other laser tunnels you may have seen.  By carefully timing the laser pulses to the motor, we can make the tunnel as disorienting as a physical rotating tunnel.  Furthermore, this design should be safer than other DIY laser tunnels you may have seen online.
 
 ## Safety
 
@@ -17,8 +15,9 @@ http://www.ecfr.gov/graphics/er01fe93.031.gif
 * Never point a laser at someone else’s eyes.
 * Never point a laser into the sky.  Doing so can endanger aircraft.  It’s against the law.
 * Never point a laser at a vehicle in motion.
-* Don’t omit safety features.  Several aspects of our design exist to mitigate certain safety risks.
+* Don’t omit safety features.  Several aspects of the design exist to reduce risks.
 * The build will include small parts that could be a choking hazard for small children or pets.
+* Wash your hands after handling the electronics, especially before eating.  The PCB and solder used contains lead.  Some of the electronics components might contain small amounts of other harmful substances.
 * Use a quality, UL-listed or -recognized power adapter.
 * Exercise caution against burns when using a fog machine, smoke machine, hazer, soldering iron, etc.
 * Warn your guests about the use of fog/smoke/haze, lasers, and stroboscopic effects.
@@ -26,6 +25,7 @@ http://www.ecfr.gov/graphics/er01fe93.031.gif
 **Disclaimer**:  I’m not a laser safety officer nor do I have any other specific qualifications to advise you about safety.  I have done some online research in order to design this laser tunnel to be safer than others I’ve seen online, but I cannot guarantee that it’s consistent with any specific regulations or best practices.  Build and use this laser tunnel at your own risk.
 
 ## Materials
+
 * A 5-volt DC dot laser module that produces 5 mW or less.  I’m using 650nm (red) laser, because they seem to be much cheaper than other colors.  Do not use an infrared laser--those are invisible.  I would stay away from blue or purple lasers because they tend to be much more powerful.  You do not want to use a laser pointer.  A laser module is one component in a laser pointer and they are also used CD and DVD players, so they are generally easy to find online and quite affordable.  Laser modules often come with a lens that transforms the beam into a line, fan, or cross shape.  For this effect, you want a dot laser.
 
 * A 4-pin computer fan (often called a PC case fan).  The case of the fan should be 80 mm in width and height..  A 4-pin fan has extra wires that will allow us to control the speed and timing of the effect.
@@ -84,7 +84,7 @@ The fan should fit snuggly into the rectangular recess at one end of the bracket
 
 With the fan in place, slip the M4 nuts into the hexagonal recesses on the front, and insert the M4 screws into the holes on the opposite side.  Hold a finger tip over the nut recess so that the nut doesn't slip out and tighten the screw manually from the back using a screwdriver.  The screw should engage with the nut and pull it all the way into the recess.
 
-Avoid overtightening, which might crack the plastic.  If both nuts are fully seated and the heads of the screws are against the bracket, the fan should be securely connected ot the bracket.
+Avoid overtightening, which might crack the plastic.  If both nuts are fully seated and the heads of the screws are against the bracket, the fan should be securely connected tp the bracket.
 
 ### Install the circuit board
 
@@ -94,7 +94,57 @@ The board has three mounting holes that correspond to the three posts in the mid
 
 Carefully attach the PCB using the three M3 x 10mm machine screws.  You will need a small screwdriver.  Do not overtighten.  The ends of the screws should not protrude beyond the flat bottom of the bracket.  Look at the side of the assembly to check that the edge of the bracket is parallel to the edge of the circuit board.  If they're not, you may have overtightened one or more of the PCB screws.
 
-###
+### Install the laser module
+
+The laser module consists of a laser diode, a current-limiting resistor, and a lens.  Two wires are pre-soldered to the module.  Handle with care.  A strong tug could snap the wires off of the module, and re-soldering them could prove challenging.
+
+Although an ideal laser would not need a lens for focus, laser diodes are not quite ideal.  The lens will focus the roughly rectangular cross section of the beam into a dot.  The focal distance can be  changed by twisting the front part of the module relative to the back part.  Initially, these can be sticky.  Do not use tools (pliers, wrenches, etc.) to try to adjust the focus, as you will likely damage the module.  With just your fingers try to turn the front of the barrel counterclockwise as though you're trying to loosen a tight screw.  You can always adjust the focus later, when the laser is actually on.
+
+Slide the laser module into the laser mount so that the lens is facing the fan and about flush with the mount.  The back of the module will extend behind the mount.  The laser is held in the mount with friction.
+
+If it seems too hard to slide the laser into the mount, check that the slot on top of the mount is completely clear.  Sometimes, when printing, a bit of plastic will remain to bridge the slot.  Use a knife to cut through any plastic that's briding the slot.
+
+The wires from the laser should be connected to the screw terminal block marked `LASER`.  Do _not_ connect them to the screw terminal block marked `EMERGENCY STOP`.  I highly recommend crimping ferrules onto the ends of the laser wires.
+
+Watch the polarity!  The red wire should be connected to the terminal marked `+`.  The blue (or possibly black) wire should be connected to the `-` terminal.  Getting that backwards could damage your laser module.
+
+Secure the wires and then give them a gentle tug to make sure they're not likely to slip out.
+
+### Connect the fan
+
+The fan cable should fit over the four-pin header next to the power connector.  The header has a plastic tab to ensure the cable is oriented the correct way.  Don't force it.  When you have the connectors aligned correctly, they will slide together easily.
+
+Make sure the excess cable is clear of the fan.  You don't want it where it could touch the spinning bits nor cast a shadow from the laser beam.
+
+### Install the Arduino Pro Mini
+
+### Install the audio player
+
+### Place the jumper for continous triggering
+
+### Connect the power
+
+## Troubleshooting
+
+## Making an enclosure
+
+The base of the bracket has three holes that can accommodate #6 flat head screws (e.g., wood screws).
+
+## Optional outputs
+
+### Audio
+
+### Fog signal
+
+### House lights signal
+
+## Optional inputs
+
+### Remote emergency stop switch
+
+### Sensors for triggering
+
+### Sensors for suppressing the laser
 
 ## Failure Modes
 
