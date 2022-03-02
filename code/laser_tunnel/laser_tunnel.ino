@@ -10,13 +10,13 @@
 
 #include <Arduino.h>
 #include "aidassert.h"
+#include "fan.h"
 #include "laser.h"
 #include "pins.h"
 #include "timers.h"
 
 // MCU Resources
-const auto fan_tach_pin   = DigitalInputPin(2);
-const auto fan_pwm_pin    = DigitalOutputPin(3);
+auto fan = Fan(/*tach=*/2, /*pwm=*/3);
 auto laser = Laser(4);
 const auto emergency_stop = DigitalInputPin(5);
 const auto suppress_high  = DigitalInputPin(6);
@@ -88,7 +88,8 @@ const uint8_t pattern[] = {
   0b00000000
 };
 
-constexpr uint16_t pattern_size = 8*sizeof(pattern);
+constexpr uint16_t pattern_byte_count = sizeof(pattern);
+constexpr uint16_t pattern_size = 8*pattern_byte_count;
 
 // `scan_start` is a bit offset into the pattern where the
 // scan should begin when the tachometer pulse is detected.
@@ -96,20 +97,35 @@ constexpr uint16_t pattern_size = 8*sizeof(pattern);
 volatile uint8_t scan_byte = 0;
 volatile uint8_t scan_mask = 0b10000000;
 volatile uint16_t scan_start = 0;
-volatile unsigned long pulse_time = 0;
+volatile unsigned long rev_time = 0;
 
-// `pulse_flag` could be function static, but that generates
+// Since there are two pulses per revolution, we need to ignore
+// every other pulse.  `half_rev` is a toggle used by the fan
+// pulse interrupt service routines to skip every other pulse.
+// The variable could be function static, but that generates
 // slower code.
-bool pulse_flag = false;
+bool half_rev = false;
+
+// When running the effect, we make sure to align the pixel
+// clock and the pattern scanning to the beginning of each
+// revolution.
 void fanPulseISR() {
-  pulse_flag = !pulse_flag;
-  if (pulse_flag) return;
+  half_rev = !half_rev;
+  if (half_rev) return;
   pixel_clock.resync();  // keep the pixel clock aligned with revolutions
   scan_byte = scan_start >> 3;
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
-  pulse_time = micros();
 }
 
+// During calibration, this ISR notes the time (in microseconds)
+// for each revolution.
+void fanCalibrationISR() {
+  half_rev = !half_rev;
+  if (half_rev) return;
+  rev_time = micros();
+}
+
+// This is the pixel clock ISR.
 ISR(TIMER2_COMPA_vect) {
   if (scan_mask & pattern[scan_byte]) {
     laser.on();
@@ -121,18 +137,56 @@ ISR(TIMER2_COMPA_vect) {
     scan_mask >>= 1;
   } else {
     scan_mask = 0b10000000;
-    scan_byte = (scan_byte + 1) % sizeof(pattern);
+    scan_byte = (scan_byte + 1) % pattern_byte_count;
   }
+}
+
+unsigned long measureFanPeriod() {
+  Serial.println("Measuring fan speed...");
+  auto avg_period = 0ul;
+  auto last_rev_time = micros();
+  fan.run(fanCalibrationISR);
+  for (auto samples = 250; samples > 0; ) {
+    if (emergency_stop.read() == LOW) emergencyStop();
+    if (rev_time) {
+      noInterrupts();
+      const auto this_rev_time = rev_time;
+      rev_time = 0;
+      interrupts();
+      const auto period = this_rev_time - last_rev_time;
+      last_rev_time = this_rev_time;
+      avg_period = (15*avg_period + period + 8) / 16;
+      --samples;
+      status_pin.toggle();
+    }
+  }
+  fan.stop();
+  status_pin.clear();
+
+  const auto freq = 1000000ul * 100ul / avg_period;
+  const auto rpm = (60 * freq + 50) / 100;
+  Serial.print(F("  Revolution time: "));
+  Serial.print(avg_period);
+  Serial.println(F(" us (average)"));
+  Serial.print(F("  Speed:           "));
+  Serial.print(rpm);
+  Serial.println(F(" RPM"));
+
+  return avg_period;
 }
 
 [[noreturn]] void emergencyStop() {
   noInterrupts();
   laser.disable();
-  fan_pwm_pin.clear();
+  fan.stop();
   pixel_clock.stop();
   interrupts();
   fog_pin.clear();
   house_lights_pin.set();
+
+  // We're never going to return, so this has no effect, but
+  // we'll set it for consistency.
+  state = State::Stopped;
 
   Serial.println("Emergency Stop!");
   Serial.println("Reset the microcontroller to restart.");
@@ -148,40 +202,6 @@ ISR(TIMER2_COMPA_vect) {
       }
     }
   }
-}
-
-unsigned long measureFanPeriod() {
-  Serial.println("Measuring fan speed...");
-  auto avg_period = 0ul;
-
-  auto last_pulse_time = micros();
-  fan_pwm_pin.set();
-  for (auto samples = 250; samples > 0; ) {
-    if (emergency_stop.read() == LOW) emergencyStop();
-    if (pulse_time) {
-      noInterrupts();
-      const auto period = pulse_time - last_pulse_time;
-      last_pulse_time = pulse_time;
-      pulse_time = 0;
-      interrupts();
-      avg_period = (15*avg_period + period + 8) / 16;
-      --samples;
-      status_pin.toggle();
-    }
-  }
-  fan_pwm_pin.clear();
-  status_pin.clear();
-
-  const auto freq = 1000000ul * 100ul / avg_period;
-  const auto rpm = (60 * freq + 50) / 100;
-  Serial.print(F("  Revolution time: "));
-  Serial.print(avg_period);
-  Serial.println(F(" us (average)"));
-  Serial.print(F("  Speed:           "));
-  Serial.print(rpm);
-  Serial.println(F(" RPM"));
-
-  return avg_period;
 }
 
 void beginEffect() {
@@ -205,13 +225,12 @@ void suppress() {
     Serial.print(F(" = "));
     Serial.print(duration);
     Serial.println(F(" ms"));
-    
   }
   // We keep updating suppress_until as long as a suppress sensor
   // is activated.  Effectively, the suppress time applies once
   // the sensor is deactivated.
   const auto duration =
-    map(analogRead(suppress_time_pin), 1023, 0, 1000, 60000);
+    map(analogRead(suppress_time_pin), 1023, 0, 3000, 30000);
   suppress_until = millis() + duration;
 }
 
@@ -229,21 +248,13 @@ void setup() {
   Serial.println(F("Copyright 2022 Adrian McCarthy"));
   Serial.println(F("https://github.com/aidtopia/laser_tunnel"));
 
-  // The tachometer output from the fan must be connected
-  // to a pin that can generate external interrupts.
-  ASSERT(digitalPinToInterrupt(fan_tach_pin) != NOT_AN_INTERRUPT);
-
-  // Initial outputs
   status_pin.begin(LOW);
   laser.begin();
+  fan.begin();
   fog_pin.begin(LOW);
   house_lights_pin.begin(LOW);
-  fan_pwm_pin.begin(LOW);
 
-  // Set up the inputs
   emergency_stop.begin(INPUT_PULLUP);
-  pinMode(fan_tach_pin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(fan_tach_pin), fanPulseISR, FALLING);
   suppress_high.begin();
   suppress_low.begin(INPUT_PULLUP);
   trigger_high.begin();
@@ -258,7 +269,7 @@ void setup() {
   Serial.println(" Hz.");
 
   pixel_clock.begin(pixel_freq);
-  fan_pwm_pin.set();
+  fan.run(fanPulseISR);
   Serial.println("Initialization complete.");
   state = State::Idle;
 }
