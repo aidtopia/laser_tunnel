@@ -9,20 +9,50 @@
 // be portable to any 5V/16 MHz AVR processor.
 
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 #include "aidassert.h"
+#include "audiomodule.h"
 #include "fan.h"
 #include "laser.h"
 #include "pins.h"
 #include "timers.h"
 
+
+class SoundFX : public AdvancedAudioEventHandler {
+  public:
+    SoundFX(int rx_pin, int tx_pin, int busy_pin) :
+      m_serial(rx_pin, tx_pin),
+      m_busy(busy_pin),
+      m_module(m_serial) {}
+
+    void begin() {
+      m_busy.begin();
+      m_module.begin(this);
+    }
+    void update() { m_module.update(); }
+
+    void loopAmbientSound() { m_module.loopFile(2); }
+    void playStartleSound() { m_module.playFile(1); }
+    bool isBusy() const { return m_busy.read() == LOW; }
+
+  private:
+    SoftwareSerial m_serial;
+    DigitalInputPin m_busy;
+    AudioModule<SoftwareSerial> m_module;
+};
+
 // MCU Resources
-auto fan = Fan(/*tach=*/2, /*pwm=*/3);
-auto laser = Laser(4);
+auto fan                  = Fan(/*tach=*/2, /*pwm=*/3);
+auto laser                = Laser(4);
 const auto emergency_stop = DigitalInputPin(5);
 const auto suppress_high  = DigitalInputPin(6);
 const auto suppress_low   = DigitalInputPin(7);
 const auto trigger_high   = DigitalInputPin(8);
 const auto trigger_low    = DigitalInputPin(9);
+//auto serial_for_audio     = SoftwareSerial(10, 12);
+// auto audio                = make_AudioModule(serial_for_audio);
+auto sound                = SoundFX(10, 12, 11);
+//const auto audio_busy_pin = DigitalInputPin(11);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
 const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
@@ -30,6 +60,8 @@ const auto effect_time_pin = A3;
 const auto suppress_time_pin = A2;
 
 Timer<2> pixel_clock;
+
+//AdvancedAudioEventHandler audio_handler;
 
 enum class State {
   Initializing,
@@ -207,7 +239,15 @@ unsigned long measureFanPeriod() {
 void beginEffect() {
   Serial.println(F("Triggered."));
   fog_pin.set();
+  sound.playStartleSound();
   state = State::Running;
+}
+
+void endEffect() {
+  Serial.println(F("Effect ended."));
+  fog_pin.clear();
+  sound.loopAmbientSound();
+  state = State::Idle;
 }
 
 void suppress() {
@@ -251,6 +291,10 @@ void setup() {
   status_pin.begin(LOW);
   laser.begin();
   fan.begin();
+
+  //audio.begin(&audio_handler);
+  sound.begin();
+
   fog_pin.begin(LOW);
   house_lights_pin.begin(LOW);
 
@@ -271,6 +315,7 @@ void setup() {
   pixel_clock.begin(pixel_freq);
   fan.run(fanPulseISR);
   Serial.println("Initialization complete.");
+  sound.loopAmbientSound();
   state = State::Idle;
 }
 
@@ -282,6 +327,9 @@ void loop() {
   } else if (suppressed && millis() > suppress_until) {
     unsuppress();
   }
+
+  //audio.update();
+  sound.update();
   
   switch (state) {
     case State::Idle:
@@ -294,6 +342,7 @@ void loop() {
       noInterrupts();
       scan_start = (scan_start + 1) % (pattern_size);
       interrupts();
+      if (!sound.isBusy()) endEffect();
       break;
     default:
       Serial.print(F("Laser Tunnel in unexpected state: "));
