@@ -11,35 +11,12 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include "aidassert.h"
-#include "audiomodule.h"
 #include "fan.h"
 #include "laser.h"
 #include "pins.h"
+#include "soundfx.h"
+#include "timeout.h"
 #include "timers.h"
-
-
-class SoundFX : public AdvancedAudioEventHandler {
-  public:
-    SoundFX(int rx_pin, int tx_pin, int busy_pin) :
-      m_serial(rx_pin, tx_pin),
-      m_busy(busy_pin),
-      m_module(m_serial) {}
-
-    void begin() {
-      m_busy.begin();
-      m_module.begin(this);
-    }
-    void update() { m_module.update(); }
-
-    void loopAmbientSound() { m_module.loopFile(2); }
-    void playStartleSound() { m_module.playFile(1); }
-    bool isBusy() const { return m_busy.read() == LOW; }
-
-  private:
-    SoftwareSerial m_serial;
-    DigitalInputPin m_busy;
-    AudioModule<SoftwareSerial> m_module;
-};
 
 // MCU Resources
 auto fan                  = Fan(/*tach=*/2, /*pwm=*/3);
@@ -49,10 +26,7 @@ const auto suppress_high  = DigitalInputPin(6);
 const auto suppress_low   = DigitalInputPin(7);
 const auto trigger_high   = DigitalInputPin(8);
 const auto trigger_low    = DigitalInputPin(9);
-//auto serial_for_audio     = SoftwareSerial(10, 12);
-// auto audio                = make_AudioModule(serial_for_audio);
-auto sound                = SoundFX(10, 12, 11);
-//const auto audio_busy_pin = DigitalInputPin(11);
+auto soundfx              = SoundFX(10, 12, 11);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
 const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
@@ -60,8 +34,6 @@ const auto effect_time_pin = A3;
 const auto suppress_time_pin = A2;
 
 Timer<2> pixel_clock;
-
-//AdvancedAudioEventHandler audio_handler;
 
 enum class State {
   Initializing,
@@ -74,8 +46,7 @@ enum class State {
 // Suppress is not part of the state machine.  When supressed,
 // the laser is disabled until the suppress signal has been LOW
 // for the suppress time.
-bool suppressed = false;
-unsigned long suppress_until = 0uL;
+Timeout<MillisClock> suppress;
 
 // Issuing fog is also not part of the state machine, but part
 // of the animation sequence.
@@ -174,26 +145,31 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 unsigned long measureFanPeriod() {
-  Serial.println("Measuring fan speed...");
+  Serial.print("Measuring fan speed");
   auto avg_period = 0ul;
   auto last_rev_time = micros();
   fan.run(fanCalibrationISR);
-  for (auto samples = 250; samples > 0; ) {
-    if (emergency_stop.read() == LOW) emergencyStop();
-    if (rev_time) {
-      noInterrupts();
-      const auto this_rev_time = rev_time;
-      rev_time = 0;
-      interrupts();
-      const auto period = this_rev_time - last_rev_time;
-      last_rev_time = this_rev_time;
-      avg_period = (15*avg_period + period + 8) / 16;
-      --samples;
-      status_pin.toggle();
+  for (auto i = 0; i < 5; ++i) {
+    Serial.print('.');
+    Serial.flush();
+    for (auto samples = 50; samples > 0; ) {
+      if (emergency_stop.read() == LOW) emergencyStop();
+      if (rev_time) {
+        noInterrupts();
+        const auto this_rev_time = rev_time;
+        rev_time = 0;
+        interrupts();
+        const auto period = this_rev_time - last_rev_time;
+        last_rev_time = this_rev_time;
+        avg_period = (15*avg_period + period + 8) / 16;
+        --samples;
+        status_pin.toggle();
+      }
     }
   }
   fan.stop();
   status_pin.clear();
+  Serial.println();
 
   const auto freq = 1000000ul * 100ul / avg_period;
   const auto rpm = (60 * freq + 50) / 100;
@@ -213,6 +189,7 @@ unsigned long measureFanPeriod() {
   fan.stop();
   pixel_clock.stop();
   interrupts();
+  soundfx.stop();
   fog_pin.clear();
   house_lights_pin.set();
 
@@ -239,22 +216,20 @@ unsigned long measureFanPeriod() {
 void beginEffect() {
   Serial.println(F("Triggered."));
   fog_pin.set();
-  sound.playStartleSound();
+  soundfx.playStartleSound();
   state = State::Running;
 }
 
 void endEffect() {
   Serial.println(F("Effect ended."));
   fog_pin.clear();
-  sound.loopAmbientSound();
   state = State::Idle;
 }
 
-void suppress() {
-  if (!suppressed) {
+void suppressLaser() {
+  if (!suppress.active()) {
     Serial.println(F("Suppressing!"));
     laser.disable();
-    suppressed = true;
 
     // temp for debugging
     const auto setting = analogRead(suppress_time_pin);
@@ -266,19 +241,19 @@ void suppress() {
     Serial.print(duration);
     Serial.println(F(" ms"));
   }
-  // We keep updating suppress_until as long as a suppress sensor
-  // is activated.  Effectively, the suppress time applies once
-  // the sensor is deactivated.
+  // We keep updating the suppress time as long as a suppress
+  // sensor is activated.  Effectively, the suppress time applies
+  // once the sensor is deactivated.
   const auto duration =
     map(analogRead(suppress_time_pin), 1023, 0, 3000, 30000);
-  suppress_until = millis() + duration;
+  suppress.set(duration);
 }
 
-void unsuppress() {
-  if (suppressed) {
+void unsuppressLaser() {
+  if (suppress.active()) {
     Serial.println(F("Suppress time has elapsed."));
     laser.enable();
-    suppressed = false;
+    suppress.cancel();
   }
 }
 
@@ -291,10 +266,7 @@ void setup() {
   status_pin.begin(LOW);
   laser.begin();
   fan.begin();
-
-  //audio.begin(&audio_handler);
-  sound.begin();
-
+  soundfx.begin();
   fog_pin.begin(LOW);
   house_lights_pin.begin(LOW);
 
@@ -315,7 +287,6 @@ void setup() {
   pixel_clock.begin(pixel_freq);
   fan.run(fanPulseISR);
   Serial.println("Initialization complete.");
-  sound.loopAmbientSound();
   state = State::Idle;
 }
 
@@ -323,13 +294,12 @@ void loop() {
   if (emergency_stop.read() == LOW) emergencyStop();
 
   if (suppress_high.read() == HIGH || suppress_low.read() == LOW) {
-    suppress();
-  } else if (suppressed && millis() > suppress_until) {
-    unsuppress();
+    suppressLaser();
+  } else if (suppress.expired()) {
+    unsuppressLaser();
   }
 
-  //audio.update();
-  sound.update();
+  soundfx.update();
   
   switch (state) {
     case State::Idle:
@@ -342,7 +312,13 @@ void loop() {
       noInterrupts();
       scan_start = (scan_start + 1) % (pattern_size);
       interrupts();
-      if (!sound.isBusy()) endEffect();
+      if (!soundfx.isBusy()) {
+        if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
+          // Don't bother going idle, just run another round.
+          beginEffect();
+        }
+        endEffect();
+      }
       break;
     default:
       Serial.print(F("Laser Tunnel in unexpected state: "));

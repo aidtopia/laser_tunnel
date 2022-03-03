@@ -1,3 +1,6 @@
+#ifndef TIMEOUT_H
+#define TIMEOUT_H
+
 #include <limits.h>
 
 struct MillisClock { static decltype(millis()) now() { return millis(); } };
@@ -11,6 +14,8 @@ class Timeout {
     typedef decltype(Clock::now()) TimeRep;
   
     Timeout() : m_expires(0) {}
+
+    bool active() const { return m_expires != 0; }
 
     void cancel() { m_expires = 0; }
 
@@ -44,3 +49,5 @@ class Timeout {
     static constexpr TimeRep MSB_MASK =
       static_cast<TimeRep>(1) << (CHAR_BIT * sizeof(TimeRep) - 1);
 };
+
+#endif

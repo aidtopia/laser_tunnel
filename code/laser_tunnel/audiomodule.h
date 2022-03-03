@@ -3,6 +3,8 @@
 
 // A library that works with various serial audio modules,
 // like DFPlayer Mini, Catalex, etc.
+#ifndef AUDIOMODULE_H
+#define AUDIOMODULE_H
 
 #include "timeout.h"
 
@@ -483,3 +485,5 @@ class AdvancedAudioEventHandler : public BasicAudioEventHandler {
     virtual void onStatus(Device device, ModuleState state);
     virtual void onVolume(uint8_t volume);
 };
+
+#endif

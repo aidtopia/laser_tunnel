@@ -111,16 +111,21 @@ uint16_t Audio::Message::sum() const {
   return s;
 }
 
-void AdvancedAudioEventHandler::onMessageSent(const Audio::Message &msg) {
+void AdvancedAudioEventHandler::onMessageSent(const Audio::Message &/*msg*/) {
+#if 0
   Serial.print(F("Sent:     "));
   printMessageBytes(msg);
   Serial.println();
+#endif
 }
 
 void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
+#if 0
   Serial.print(F("Received: "));
   printMessageBytes(msg);
   Serial.println();
+#endif
+
 
   switch (msg.getMessageID()) {
     case 0x3A: {
