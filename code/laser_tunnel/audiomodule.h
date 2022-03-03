@@ -150,12 +150,6 @@ struct Audio {
       uint8_t m_buf[10];
       int m_length;
   };
-
-  static void printDeviceName(Device src);
-  static void printEqualizerName(Equalizer eq);
-  static void printModuleStateName(ModuleState state);
-  static void printSequenceName(Sequence seq);
-  static void printMessageBytes(const Message &msg);
 };
 
 class BasicAudioModule;
@@ -468,26 +462,59 @@ AudioModule<SerialType> make_AudioModule(SerialType &serial) {
 
 class AdvancedAudioEventHandler : public BasicAudioEventHandler {
   public:
+    void onMessageReceived(const Message &msg) override;
+    void onTimedOut() override;
+
+    virtual void onAck() {};
+    virtual void onCurrentTrack(Device /*src*/, uint16_t /*track*/) {};
+    virtual void onDeviceInserted(Device /*src*/) {};
+    virtual void onDeviceFileCount(Device /*src*/, uint16_t /*count*/) {};
+    virtual void onDeviceRemoved(Device /*src*/) {};
+    virtual void onError(ErrorCode /*code*/) {};
+    virtual void onEqualizer(Equalizer /*eq*/) {};
+    virtual void onFinishedFile(Device /*src*/, uint16_t /*file_index*/) {};
+    virtual void onFirmwareVersion(uint16_t /*version*/) {};
+    virtual void onFolderCount(uint16_t /*count*/) {};
+    virtual void onFolderTrackCount(uint16_t /*count*/) {};
+    virtual void onInitComplete(uint16_t /*devices*/) {};
+    virtual void onMessageInvalid() {};
+    virtual void onPlaybackSequence(Sequence /*seq*/) {};
+    virtual void onStatus(Device /*device*/, ModuleState /*state*/) {};
+    virtual void onVolume(uint8_t /*volume*/) {};
+};
+
+#ifndef NDEBUG
+class DebugAudioEventHandler : public AdvancedAudioEventHandler {
+  public:
     void onMessageSent(const Message &msg) override;
     void onMessageReceived(const Message &msg) override;
     void onTimedOut() override;
 
-    virtual void onAck();
-    virtual void onCurrentTrack(Device src, uint16_t track);
-    virtual void onDeviceInserted(Device src);
-    virtual void onDeviceFileCount(Device src, uint16_t count);
-    virtual void onDeviceRemoved(Device src);
-    virtual void onError(ErrorCode code);
-    virtual void onEqualizer(Equalizer eq);
-    virtual void onFinishedFile(Device device, uint16_t file_index);
-    virtual void onFirmwareVersion(uint16_t version);
-    virtual void onFolderCount(uint16_t count);
-    virtual void onFolderTrackCount(uint16_t count);
-    virtual void onInitComplete(uint16_t devices);
-    virtual void onMessageInvalid();
-    virtual void onPlaybackSequence(Sequence seq);
-    virtual void onStatus(Device device, ModuleState state);
-    virtual void onVolume(uint8_t volume);
+    void onAck() override;
+    void onCurrentTrack(Device src, uint16_t track) override;
+    void onDeviceInserted(Device src) override;
+    void onDeviceFileCount(Device src, uint16_t count) override;
+    void onDeviceRemoved(Device src) override;
+    void onError(ErrorCode code) override;
+    void onEqualizer(Equalizer eq) override;
+    void onFinishedFile(Device device, uint16_t file_index) override;
+    void onFirmwareVersion(uint16_t version) override;
+    void onFolderCount(uint16_t count) override;
+    void onFolderTrackCount(uint16_t count) override;
+    void onInitComplete(uint16_t devices) override;
+    void onMessageInvalid() override;
+    void onPlaybackSequence(Sequence seq) override;
+    void onStatus(Device device, ModuleState state) override;
+    void onVolume(uint8_t volume) override;
+
+  protected:
+    static void printDeviceName(Device src);
+    static void printEqualizerName(Equalizer eq);
+    static void printModuleStateName(ModuleState state);
+    static void printSequenceName(Sequence seq);
+    static void printMessageBytes(const Message &msg);
 };
+#endif
+
 
 #endif

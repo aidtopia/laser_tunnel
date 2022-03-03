@@ -1,59 +1,6 @@
 #include <Arduino.h>
 #include "audiomodule.h"
 
-void Audio::printDeviceName(Audio::Device src) {
-  switch (src) {
-    case DEV_USB:    Serial.print(F("USB")); break;
-    case DEV_SDCARD: Serial.print(F("SD Card")); break;
-    case DEV_AUX:    Serial.print(F("AUX")); break;
-    case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
-    case DEV_FLASH:  Serial.print(F("FLASH")); break;
-    default:         Serial.print(F("Unknown Device")); break;
-  }
-}
-
-void Audio::printEqualizerName(Audio::Equalizer eq) {
-  switch (eq) {
-    case EQ_NORMAL:    Serial.print(F("Normal"));    break;
-    case EQ_POP:       Serial.print(F("Pop"));       break;
-    case EQ_ROCK:      Serial.print(F("Rock"));      break;
-    case EQ_JAZZ:      Serial.print(F("Jazz"));      break;
-    case EQ_CLASSICAL: Serial.print(F("Classical")); break;
-    case EQ_BASS:      Serial.print(F("Bass"));      break;
-    default:           Serial.print(F("Unknown EQ")); break;
-  }
-}
-
-void Audio::printModuleStateName(Audio::ModuleState state) {
-  switch (state) {
-    case MS_STOPPED: Serial.print(F("Stopped")); break;
-    case MS_PLAYING: Serial.print(F("Playing")); break;
-    case MS_PAUSED:  Serial.print(F("Paused"));  break;
-    case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
-    default:         Serial.print(F("???"));     break;
-  }
-}
-
-void Audio::printSequenceName(Audio::Sequence seq) {
-  switch (seq) {
-    case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
-    case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
-    case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
-    case SEQ_RANDOM:     Serial.print(F("Random")); break;
-    case SEQ_SINGLE:     Serial.print(F("Single")); break;
-    default:             Serial.print(F("???")); break;
-  }
-}
-
-void Audio::printMessageBytes(const Audio::Message &msg) {
-  const auto *buf = msg.getBuffer();
-  const auto len = msg.getLength();
-  for (int i = 0; i < len; ++i) {
-    Serial.print(F(" "));
-    Serial.print(buf[i], HEX);
-  }
-}
-
 Audio::Message::Message() :
   m_buf{START, VERSION, LENGTH, 0, FEEDBACK, 0, 0, 0, 0, END},
   m_length(0) {}
@@ -111,21 +58,7 @@ uint16_t Audio::Message::sum() const {
   return s;
 }
 
-void AdvancedAudioEventHandler::onMessageSent(const Audio::Message &/*msg*/) {
-#if 0
-  Serial.print(F("Sent:     "));
-  printMessageBytes(msg);
-  Serial.println();
-#endif
-}
-
 void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
-#if 0
-  Serial.print(F("Received: "));
-  printMessageBytes(msg);
-  Serial.println();
-#endif
-
   switch (msg.getMessageID()) {
     case 0x3A: {
       const auto mask = msg.getParamLo();
@@ -198,38 +131,56 @@ void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
   }
 }
 
-void AdvancedAudioEventHandler::onTimedOut() {
-  Serial.println(F("Timed out."));
+void AdvancedAudioEventHandler::onTimedOut() { onError(EC_TIMEDOUT); }
+
+#ifndef NDEBUG
+void DebugAudioEventHandler::onMessageSent(const Audio::Message &msg) {
+  Serial.print(F("Sent:     "));
+  printMessageBytes(msg);
+  Serial.println();
+  AdvancedAudioEventHandler::onMessageSent(msg);
 }
 
-void AdvancedAudioEventHandler::onAck() {
+void DebugAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
+  Serial.print(F("Received: "));
+  printMessageBytes(msg);
+  Serial.println();
+  AdvancedAudioEventHandler::onMessageReceived(msg);
+}
+
+void DebugAudioEventHandler::onTimedOut() {
+  Serial.println(F("Timed out."));
+  AdvancedAudioEventHandler::onTimedOut();
+}
+
+void DebugAudioEventHandler::onAck() {
   Serial.println(F("ACK"));
 }
 
-void AdvancedAudioEventHandler::onCurrentTrack(Device device, uint16_t file_index) {
+void DebugAudioEventHandler::onCurrentTrack(Device device, uint16_t file_index) {
   printDeviceName(device);
   Serial.print(F(" current file index: "));
   Serial.println(file_index);
 }
 
-void AdvancedAudioEventHandler::onDeviceInserted(Device src) {
+void DebugAudioEventHandler::onDeviceInserted(Device src) {
   Serial.print(F("Device inserted: "));
   printDeviceName(src);
   Serial.println();
 }
 
-void AdvancedAudioEventHandler::onDeviceRemoved(Device src) {
+void DebugAudioEventHandler::onDeviceRemoved(Device src) {
   printDeviceName(src);
   Serial.println(F(" removed."));
 }
 
-void AdvancedAudioEventHandler::onEqualizer(Equalizer eq) {
+void DebugAudioEventHandler::onEqualizer(Equalizer eq) {
   Serial.print(F("Equalizer: "));
   printEqualizerName(eq);
   Serial.println();
 }
 
-void AdvancedAudioEventHandler::onError(Audio::ErrorCode code) {
+void DebugAudioEventHandler::onError(Audio::ErrorCode code) {
   Serial.print(F("Error "));
   Serial.print(code);
   Serial.print(F(": "));
@@ -249,7 +200,7 @@ void AdvancedAudioEventHandler::onError(Audio::ErrorCode code) {
   }
 }
 
-void AdvancedAudioEventHandler::onDeviceFileCount(Device device, uint16_t count) {
+void DebugAudioEventHandler::onDeviceFileCount(Device device, uint16_t count) {
   printDeviceName(device);
   Serial.print(F(" file count: "));
   Serial.println(count);
@@ -267,29 +218,29 @@ void AdvancedAudioEventHandler::onDeviceFileCount(Device device, uint16_t count)
 // This hook does not trigger when an inserted track finishes.
 // If you need to know that, you can try watching for a brief
 // blink on the BUSY pin of the DF Player Mini.
-void AdvancedAudioEventHandler::onFinishedFile(Device device, uint16_t file_index) {
+void DebugAudioEventHandler::onFinishedFile(Device device, uint16_t file_index) {
   Serial.print(F("Finished playing file: "));
   printDeviceName(device);
   Serial.print(F(" "));
   Serial.println(file_index);
 }
 
-void AdvancedAudioEventHandler::onFirmwareVersion(uint16_t version) {
+void DebugAudioEventHandler::onFirmwareVersion(uint16_t version) {
   Serial.print(F("Firmware Version: "));
   Serial.println(version);
 }
 
-void AdvancedAudioEventHandler::onFolderCount(uint16_t count) {
+void DebugAudioEventHandler::onFolderCount(uint16_t count) {
   Serial.print(F("Folder count: "));
   Serial.println(count);
 }
 
-void AdvancedAudioEventHandler::onFolderTrackCount(uint16_t count) {
+void DebugAudioEventHandler::onFolderTrackCount(uint16_t count) {
   Serial.print(F("Folder track count: "));
   Serial.println(count);
 }
 
-void AdvancedAudioEventHandler::onInitComplete(uint16_t devices) {
+void DebugAudioEventHandler::onInitComplete(uint16_t devices) {
   Serial.print(F("Hardware initialization complete.  Device(s) online:"));
   if (devices & (1u << DEV_SDCARD)) Serial.print(F(" SD Card"));
   if (devices & (1u << DEV_USB))    Serial.print(F(" USB"));
@@ -298,17 +249,17 @@ void AdvancedAudioEventHandler::onInitComplete(uint16_t devices) {
   Serial.println();
 }
 
-void AdvancedAudioEventHandler::onMessageInvalid() {
+void DebugAudioEventHandler::onMessageInvalid() {
   Serial.println(F("Invalid message received."));
 }
 
-void AdvancedAudioEventHandler::onPlaybackSequence(Audio::Sequence seq) {
+void DebugAudioEventHandler::onPlaybackSequence(Audio::Sequence seq) {
   Serial.print(F("Playback sequence: "));
   printSequenceName(seq);
   Serial.println();
 }
 
-void AdvancedAudioEventHandler::onStatus(Device device, ModuleState state) {
+void DebugAudioEventHandler::onStatus(Device device, ModuleState state) {
   Serial.print(F("Device "));
   printDeviceName(device);
   Serial.print(F(" status: "));
@@ -316,18 +267,62 @@ void AdvancedAudioEventHandler::onStatus(Device device, ModuleState state) {
   Serial.println();
 }
 
-void AdvancedAudioEventHandler::onVolume(uint8_t volume) {
+void DebugAudioEventHandler::onVolume(uint8_t volume) {
   Serial.print(F("Volume: "));
   Serial.println(volume);
 }
 
-#if 0
-BasicAudioModule::InitResettingHardware    BasicAudioModule::s_init_resetting_hardware;
-BasicAudioModule::InitGettingVersion       BasicAudioModule::s_init_getting_version;
-BasicAudioModule::InitCheckingUSBFileCount BasicAudioModule::s_init_checking_usb_file_count;
-BasicAudioModule::InitCheckingSDFileCount  BasicAudioModule::s_init_checking_sd_file_count;
-BasicAudioModule::InitSelectingUSB         BasicAudioModule::s_init_selecting_usb;
-BasicAudioModule::InitSelectingSD          BasicAudioModule::s_init_selecting_sd;
-BasicAudioModule::InitCheckingFolderCount  BasicAudioModule::s_init_checking_folder_count;
-BasicAudioModule::InitStartPlaying         BasicAudioModule::s_init_start_playing;
+void DebugAudioEventHandler::printDeviceName(Audio::Device src) {
+  switch (src) {
+    case DEV_USB:    Serial.print(F("USB")); break;
+    case DEV_SDCARD: Serial.print(F("SD Card")); break;
+    case DEV_AUX:    Serial.print(F("AUX")); break;
+    case DEV_SLEEP:  Serial.print(F("SLEEP (does this make sense)")); break;
+    case DEV_FLASH:  Serial.print(F("FLASH")); break;
+    default:         Serial.print(F("Unknown Device")); break;
+  }
+}
+
+void DebugAudioEventHandler::printEqualizerName(Audio::Equalizer eq) {
+  switch (eq) {
+    case EQ_NORMAL:    Serial.print(F("Normal"));    break;
+    case EQ_POP:       Serial.print(F("Pop"));       break;
+    case EQ_ROCK:      Serial.print(F("Rock"));      break;
+    case EQ_JAZZ:      Serial.print(F("Jazz"));      break;
+    case EQ_CLASSICAL: Serial.print(F("Classical")); break;
+    case EQ_BASS:      Serial.print(F("Bass"));      break;
+    default:           Serial.print(F("Unknown EQ")); break;
+  }
+}
+
+void DebugAudioEventHandler::printModuleStateName(Audio::ModuleState state) {
+  switch (state) {
+    case MS_STOPPED: Serial.print(F("Stopped")); break;
+    case MS_PLAYING: Serial.print(F("Playing")); break;
+    case MS_PAUSED:  Serial.print(F("Paused"));  break;
+    case MS_ASLEEP:  Serial.print(F("Asleep"));  break;
+    default:         Serial.print(F("???"));     break;
+  }
+}
+
+void DebugAudioEventHandler::printSequenceName(Audio::Sequence seq) {
+  switch (seq) {
+    case SEQ_LOOPALL:    Serial.print(F("Loop All")); break;
+    case SEQ_LOOPFOLDER: Serial.print(F("Loop Folder")); break;
+    case SEQ_LOOPTRACK:  Serial.print(F("Loop Track")); break;
+    case SEQ_RANDOM:     Serial.print(F("Random")); break;
+    case SEQ_SINGLE:     Serial.print(F("Single")); break;
+    default:             Serial.print(F("???")); break;
+  }
+}
+
+void DebugAudioEventHandler::printMessageBytes(const Audio::Message &msg) {
+  const auto *buf = msg.getBuffer();
+  const auto len = msg.getLength();
+  for (int i = 0; i < len; ++i) {
+    Serial.print(F(" "));
+    Serial.print(buf[i], HEX);
+  }
+}
+
 #endif

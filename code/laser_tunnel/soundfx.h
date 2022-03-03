@@ -46,6 +46,11 @@ class SoundFX : public AdvancedAudioEventHandler {
     }
 
     void onInitComplete(uint16_t devices) override {
+      // Note that onInitComplete comes after a reset and also
+      // after a select source command.  (I think that's because
+      // the reset implicitly selects a device.)  Do not respond
+      // to this by sending a source select, or you'll get stuck
+      // in an endless loop.
       if (devices & (1u << Audio::DEV_SDCARD)) {
         m_module.queryFileCount(Audio::DEV_SDCARD);
       }
