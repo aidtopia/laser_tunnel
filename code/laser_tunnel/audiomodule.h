@@ -11,6 +11,8 @@
 // This is a base class with a bunch of definitions common to
 // audio modules and audio event handling.
 struct Audio {
+  enum Feedback { NO_FEEDBACK = 0x00, FEEDBACK = 0x01 };
+
   enum Device {
     DEV_USB,      // a storage device connected via USB
     DEV_SDCARD,   // a micro SD card in the TF slot
@@ -124,7 +126,6 @@ struct Audio {
   class Message {
     public:
       enum { START = 0x7E, VERSION = 0xFF, LENGTH = 6, END = 0xEF };
-      enum Feedback { NO_FEEDBACK = 0x00, FEEDBACK = 0x01 };
 
       Message();
 
@@ -207,7 +208,9 @@ class BasicAudioModule : public Audio {
     // files are available.
     //
     // Corresponds to playback sequence `SEQ_SINGLE`.
-    void playFile(uint16_t file_index) { sendCommand(MID_PLAYFILE, file_index); }
+    void playFile(uint16_t file_index, Feedback feedback = FEEDBACK) {
+      sendCommand(MID_PLAYFILE, file_index, feedback);
+    }
 
     // Play the next file based on the current file index.
     void playNextFile() { sendCommand(MID_PLAYNEXT); }
@@ -341,6 +344,8 @@ class BasicAudioModule : public Audio {
         case DEV_FLASH:  sendQuery(MID_FLASHFILECOUNT); break;
         default: break;
       }
+      // Counting files can take a moment.
+      m_timeout.set(2000);
     }
 
     void queryCurrentFile(Device device) {
@@ -413,18 +418,21 @@ class BasicAudioModule : public Audio {
       const auto buf = msg.getBuffer();
       const auto len = msg.getLength();
       m_stream.write(buf, len);
-      m_timeout.set(200);
       if (m_handler) m_handler->onMessageSent(msg);
     }
 
-    void sendCommand(MsgID msgid, uint16_t param = 0, bool feedback = true) {
-      m_out.set(msgid, param, feedback ? Message::FEEDBACK : Message::NO_FEEDBACK);
+    void sendCommand(MsgID msgid, uint16_t param = 0, Feedback feedback = FEEDBACK) {
+      m_out.set(msgid, param, feedback);
       sendMessage(m_out);
+      if (feedback) m_timeout.set(200);
     }
 
     void sendQuery(MsgID msgid, uint16_t param = 0) {
-      // Since queries naturally have a response, we won't ask for feedback.
-      sendCommand(msgid, param, false);
+      // Since queries naturally have a response, we won't ask for feedback, which
+      // just causes a redundant ACK response.
+      m_out.set(msgid, param, NO_FEEDBACK);
+      sendMessage(m_out);
+      m_timeout.set(200);
     }
 
     Stream  &m_stream;
@@ -513,6 +521,5 @@ class DebugAudioEventHandler : public AudioEventHandler {
     static void printMessageBytes(const Message &msg);
 };
 #endif
-
 
 #endif

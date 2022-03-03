@@ -6,7 +6,7 @@
 #include "audiomodule.h"
 #include "pins.h"
 
-class SoundFX : public AudioEventHandler {
+class SoundFX : public DebugAudioEventHandler {
   public:
     SoundFX(int rx_pin, int tx_pin, int busy_pin) :
       m_serial(rx_pin, tx_pin),
@@ -22,34 +22,63 @@ class SoundFX : public AudioEventHandler {
     }
     void update() { m_module.update(); }
 
-    enum Track : uint16_t { NONE = 0, STARTLE = 1, AMBIENT = 2, EMERGENCY = 3 };
+    // The Track values are the required file indexes for the sound
+    // effects.  User many include any number of sounds, as long as
+    // they are arranged in this order.
+    enum Track : uint16_t { NONE=0, STARTLE=1, AMBIENT=2, EMERGENCY=3 };
+
+    bool has(Track track) const {
+      const auto file_index = static_cast<uint16_t>(track);
+      return m_file_count >= file_index;
+    }
+
+    bool isBusy() const {
+      return m_file_playing == STARTLE || m_busy.read() == LOW;
+    }
 
     void play(Track track) {
-      const auto file_index = static_cast<uint16_t>(track);
-      if (track == NONE || file_index > m_file_count) {
-        m_module.stop();
+      if (track == NONE || !has(track)) {
+        if (isBusy()) m_module.stop();
         m_file_playing = 0;
         return;
       }
-      m_module.playFile(file_index);
+      const auto file_index = static_cast<uint16_t>(track);
+      m_module.playFile(file_index, Audio::NO_FEEDBACK);
       m_file_playing = file_index;
     }
 
-    bool isBusy() const { return m_busy.read() == LOW; }
+    void stop() { play(NONE); }
 
-    void stop() { m_module.stop(); }
-
+    void onDeviceInserted(Device src) override {
+      DebugAudioEventHandler::onDeviceInserted(src);
+      if (src == Audio::DEV_SDCARD) {
+        m_file_count = 0;
+        m_file_playing = 0;
+        m_module.queryFileCount(Audio::DEV_SDCARD);
+      }
+    }
+    
     void onDeviceFileCount(Device src, uint16_t count) override {
+      DebugAudioEventHandler::onDeviceFileCount(src, count);
       if (src == Audio::DEV_SDCARD) {
         m_file_count = count;
       }
     }
 
+    void onDeviceRemoved(Device src) override {
+      DebugAudioEventHandler::onDeviceRemoved(src);
+      if (src == Audio::DEV_SDCARD) {
+        m_file_count = 0;
+        m_file_playing = 0;
+      }
+    }
+
     void onInitComplete(uint16_t devices) override {
+      DebugAudioEventHandler::onInitComplete(devices);
       // Note that onInitComplete comes after a reset and also
       // after a select source command.  (I think that's because
-      // the reset implicitly selects a device.)  Do not respond
-      // to this by sending a source select, or you'll get stuck
+      // the reset implicitly selects a source.)  Do not respond
+      // to this by sending a source select or you'll get stuck
       // in an endless loop.
       if (devices & (1u << Audio::DEV_SDCARD)) {
         m_module.queryFileCount(Audio::DEV_SDCARD);
@@ -57,6 +86,7 @@ class SoundFX : public AudioEventHandler {
     }
 
     void onFinishedFile(Device device, uint16_t file_index) override {
+      DebugAudioEventHandler::onFinishedFile(device, file_index);
       if (device == Audio::DEV_SDCARD && file_index == m_file_playing) {
         m_file_playing = 0;
       }
