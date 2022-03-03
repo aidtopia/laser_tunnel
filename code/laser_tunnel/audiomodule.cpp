@@ -58,7 +58,7 @@ uint16_t Audio::Message::sum() const {
   return s;
 }
 
-void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
+void AudioEventHandler::onMessageReceived(const Audio::Message &msg) {
   switch (msg.getMessageID()) {
     case 0x3A: {
       const auto mask = msg.getParamLo();
@@ -131,26 +131,26 @@ void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
   }
 }
 
-void AdvancedAudioEventHandler::onTimedOut() { onError(EC_TIMEDOUT); }
+void AudioEventHandler::onTimedOut() { onError(EC_TIMEDOUT); }
 
 #ifndef NDEBUG
 void DebugAudioEventHandler::onMessageSent(const Audio::Message &msg) {
   Serial.print(F("Sent:     "));
   printMessageBytes(msg);
   Serial.println();
-  AdvancedAudioEventHandler::onMessageSent(msg);
+  AudioEventHandler::onMessageSent(msg);
 }
 
 void DebugAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
   Serial.print(F("Received: "));
   printMessageBytes(msg);
   Serial.println();
-  AdvancedAudioEventHandler::onMessageReceived(msg);
+  AudioEventHandler::onMessageReceived(msg);
 }
 
 void DebugAudioEventHandler::onTimedOut() {
   Serial.println(F("Timed out."));
-  AdvancedAudioEventHandler::onTimedOut();
+  AudioEventHandler::onTimedOut();
 }
 
 void DebugAudioEventHandler::onAck() {

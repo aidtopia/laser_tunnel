@@ -152,8 +152,6 @@ struct Audio {
   };
 };
 
-class BasicAudioModule;
-
 class BasicAudioEventHandler : public Audio {
   public:
     virtual void onMessageSent(const Message &/*msg*/) {}
@@ -460,7 +458,7 @@ AudioModule<SerialType> make_AudioModule(SerialType &serial) {
   return AudioModule<SerialType>(serial);
 }
 
-class AdvancedAudioEventHandler : public BasicAudioEventHandler {
+class AudioEventHandler : public BasicAudioEventHandler {
   public:
     void onMessageReceived(const Message &msg) override;
     void onTimedOut() override;
@@ -484,7 +482,7 @@ class AdvancedAudioEventHandler : public BasicAudioEventHandler {
 };
 
 #ifndef NDEBUG
-class DebugAudioEventHandler : public AdvancedAudioEventHandler {
+class DebugAudioEventHandler : public AudioEventHandler {
   public:
     void onMessageSent(const Message &msg) override;
     void onMessageReceived(const Message &msg) override;

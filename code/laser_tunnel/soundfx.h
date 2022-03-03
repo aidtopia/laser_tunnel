@@ -6,7 +6,7 @@
 #include "audiomodule.h"
 #include "pins.h"
 
-class SoundFX : public AdvancedAudioEventHandler {
+class SoundFX : public AudioEventHandler {
   public:
     SoundFX(int rx_pin, int tx_pin, int busy_pin) :
       m_serial(rx_pin, tx_pin),
