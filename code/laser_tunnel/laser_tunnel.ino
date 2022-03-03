@@ -15,6 +15,7 @@
 #include "laser.h"
 #include "pins.h"
 #include "soundfx.h"
+#include "suppressor.h"
 #include "timeout.h"
 #include "timers.h"
 
@@ -22,8 +23,7 @@
 auto fan                  = Fan(/*tach=*/2, /*pwm=*/3);
 auto laser                = Laser(4);
 const auto emergency_stop = DigitalInputPin(5);
-const auto suppress_high  = DigitalInputPin(6);
-const auto suppress_low   = DigitalInputPin(7);
+auto suppressor           = Suppressor(6, 7, A2);
 const auto trigger_high   = DigitalInputPin(8);
 const auto trigger_low    = DigitalInputPin(9);
 auto soundfx              = SoundFX(10, 12, 11);
@@ -31,7 +31,6 @@ const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
 const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
 const auto effect_time_pin = A3;
-const auto suppress_time_pin = A2;
 
 Timer<2> pixel_clock;
 
@@ -42,11 +41,6 @@ enum class State {
   Running,      // effect animation in progress
   Stopped       // we're in the emergency stop
 } state = State::Initializing;
-
-// Suppress is not part of the state machine.  When supressed,
-// the laser is disabled until the suppress signal has been LOW
-// for the suppress time.
-Timeout<MillisClock> suppress;
 
 // Issuing fog is also not part of the state machine, but part
 // of the animation sequence.
@@ -227,37 +221,6 @@ void endEffect() {
   state = State::Idle;
 }
 
-void suppressLaser() {
-  if (!suppress.active()) {
-    Serial.println(F("Suppressing!"));
-    laser.disable();
-
-    // temp for debugging
-    const auto setting = analogRead(suppress_time_pin);
-    const auto duration =
-      map(setting, 1023, 0, 1000, 60000);
-    Serial.print(F("Suppress Time: "));
-    Serial.print(setting);
-    Serial.print(F(" = "));
-    Serial.print(duration);
-    Serial.println(F(" ms"));
-  }
-  // We keep updating the suppress time as long as a suppress
-  // sensor is activated.  Effectively, the suppress time applies
-  // once the sensor is deactivated.
-  const auto duration =
-    map(analogRead(suppress_time_pin), 1023, 0, 3000, 30000);
-  suppress.set(duration);
-}
-
-void unsuppressLaser() {
-  if (suppress.active()) {
-    Serial.println(F("Suppress time has elapsed."));
-    laser.enable();
-    suppress.cancel();
-  }
-}
-
 void setup() {
   Serial.begin(9600);
   Serial.println(F("\nLaser Tunnel V1"));
@@ -272,8 +235,7 @@ void setup() {
   house_lights_pin.begin(LOW);
 
   emergency_stop.begin(INPUT_PULLUP);
-  suppress_high.begin();
-  suppress_low.begin(INPUT_PULLUP);
+  suppressor.begin();
   trigger_high.begin();
   trigger_low.begin(INPUT_PULLUP);
 
@@ -287,21 +249,26 @@ void setup() {
 
   pixel_clock.begin(pixel_freq);
   fan.run(fanPulseISR);
-  state = State::Idle;
+  state = State::Calibrating;
 }
+
+uint8_t samples = 0;
 
 void loop() {
   if (emergency_stop.read() == LOW) emergencyStop();
-
-  if (suppress_high.read() == HIGH || suppress_low.read() == LOW) {
-    suppressLaser();
-  } else if (suppress.expired()) {
-    unsuppressLaser();
-  }
-
+  suppressor.update(laser);
   soundfx.update();
   
   switch (state) {
+    case State::Calibrating:
+      if (soundfx.has(SoundFX::AMBIENT)) {
+        soundfx.play(SoundFX::AMBIENT);
+        state = State::Idle;
+      } else if (++samples == 250) {
+        // Proceed without ambient sound.
+        state = State::Idle;
+      }
+      break;
     case State::Idle:
       if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
         beginEffect();
