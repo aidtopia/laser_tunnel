@@ -6,7 +6,13 @@
 #include "audiomodule.h"
 #include "pins.h"
 
-class SoundFX : public DebugAudioEventHandler {
+#if 1
+#define SOUNDFX_BASE_CLASS AudioEventHandler
+#else
+#define SOUNDFX_BASE_CLASS DebugAudioEventHandler
+#endif
+
+class SoundFX : public SOUNDFX_BASE_CLASS {
   public:
     SoundFX(int rx_pin, int tx_pin, int busy_pin) :
       m_serial(rx_pin, tx_pin),
@@ -50,7 +56,7 @@ class SoundFX : public DebugAudioEventHandler {
     void stop() { play(NONE); }
 
     void onDeviceInserted(Device src) override {
-      DebugAudioEventHandler::onDeviceInserted(src);
+      SOUNDFX_BASE_CLASS::onDeviceInserted(src);
       if (src == Audio::DEV_SDCARD) {
         m_file_count = 0;
         m_file_playing = 0;
@@ -59,14 +65,14 @@ class SoundFX : public DebugAudioEventHandler {
     }
     
     void onDeviceFileCount(Device src, uint16_t count) override {
-      DebugAudioEventHandler::onDeviceFileCount(src, count);
+      SOUNDFX_BASE_CLASS::onDeviceFileCount(src, count);
       if (src == Audio::DEV_SDCARD) {
         m_file_count = count;
       }
     }
 
     void onDeviceRemoved(Device src) override {
-      DebugAudioEventHandler::onDeviceRemoved(src);
+      SOUNDFX_BASE_CLASS::onDeviceRemoved(src);
       if (src == Audio::DEV_SDCARD) {
         m_file_count = 0;
         m_file_playing = 0;
@@ -74,7 +80,7 @@ class SoundFX : public DebugAudioEventHandler {
     }
 
     void onInitComplete(uint16_t devices) override {
-      DebugAudioEventHandler::onInitComplete(devices);
+      SOUNDFX_BASE_CLASS::onInitComplete(devices);
       // Note that onInitComplete comes after a reset and also
       // after a select source command.  (I think that's because
       // the reset implicitly selects a source.)  Do not respond
@@ -86,7 +92,7 @@ class SoundFX : public DebugAudioEventHandler {
     }
 
     void onFinishedFile(Device device, uint16_t file_index) override {
-      DebugAudioEventHandler::onFinishedFile(device, file_index);
+      SOUNDFX_BASE_CLASS::onFinishedFile(device, file_index);
       if (device == Audio::DEV_SDCARD && file_index == m_file_playing) {
         m_file_playing = 0;
       }
@@ -104,5 +110,7 @@ class SoundFX : public DebugAudioEventHandler {
     uint16_t m_file_count;
     uint16_t m_file_playing;
 };
+
+#undef SOUNDFX_BASE_CLASS
 
 #endif

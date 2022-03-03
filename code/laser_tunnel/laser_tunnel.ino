@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include "aidassert.h"
+#include "calibrator.h"
 #include "fan.h"
 #include "laser.h"
 #include "pins.h"
@@ -32,6 +33,7 @@ const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
 const auto house_lights_pin = DigitalOutputPin(15);  // a.k.a. A1
 const auto effect_time_pin = A3;
 
+Calibrator calibrator;
 Timer<2> pixel_clock;
 
 enum class State {
@@ -94,7 +96,6 @@ constexpr uint16_t pattern_size = 8*pattern_byte_count;
 volatile uint8_t scan_byte = 0;
 volatile uint8_t scan_mask = 0b10000000;
 volatile uint16_t scan_start = 0;
-volatile unsigned long rev_time = 0;
 
 // Since there are two pulses per revolution, we need to ignore
 // every other pulse.  `half_rev` is a toggle used by the fan
@@ -114,14 +115,6 @@ void fanPulseISR() {
   scan_mask = 0b10000000u >> (scan_start & 0b0111);
 }
 
-// During calibration, this ISR notes the time (in microseconds)
-// for each revolution.
-void fanCalibrationISR() {
-  half_rev = !half_rev;
-  if (half_rev) return;
-  rev_time = micros();
-}
-
 // This is the pixel clock ISR.
 ISR(TIMER2_COMPA_vect) {
   if (scan_mask & pattern[scan_byte]) {
@@ -136,45 +129,6 @@ ISR(TIMER2_COMPA_vect) {
     scan_mask = 0b10000000;
     scan_byte = (scan_byte + 1) % pattern_byte_count;
   }
-}
-
-unsigned long measureFanPeriod() {
-  Serial.print("Measuring fan speed");
-  auto avg_period = 0ul;
-  auto last_rev_time = micros();
-  fan.run(fanCalibrationISR);
-  for (auto i = 0; i < 5; ++i) {
-    Serial.print('.');
-    Serial.flush();
-    for (auto samples = 50; samples > 0; ) {
-      if (emergency_stop.read() == LOW) emergencyStop();
-      if (rev_time) {
-        noInterrupts();
-        const auto this_rev_time = rev_time;
-        rev_time = 0;
-        interrupts();
-        const auto period = this_rev_time - last_rev_time;
-        last_rev_time = this_rev_time;
-        avg_period = (15*avg_period + period + 8) / 16;
-        --samples;
-        status_pin.toggle();
-      }
-    }
-  }
-  fan.stop();
-  status_pin.clear();
-  Serial.println();
-
-  const auto freq = 1000000ul * 100ul / avg_period;
-  const auto rpm = (60 * freq + 50) / 100;
-  Serial.print(F("  Revolution time: "));
-  Serial.print(avg_period);
-  Serial.println(F(" us (average)"));
-  Serial.print(F("  Speed:           "));
-  Serial.print(rpm);
-  Serial.println(F(" RPM"));
-
-  return avg_period;
 }
 
 [[noreturn]] void emergencyStop() {
@@ -239,20 +193,9 @@ void setup() {
   trigger_high.begin();
   trigger_low.begin(INPUT_PULLUP);
 
-  const auto fan_period_us = measureFanPeriod();
-  const float pixel_freq = 1.0e6 * pattern_size / fan_period_us;
-  Serial.print("For ");
-  Serial.print(pattern_size);
-  Serial.print(" pixels per revolution, PixelTimer must run at ");
-  Serial.print(pixel_freq);
-  Serial.println(" Hz.");
-
-  pixel_clock.begin(pixel_freq);
-  fan.run(fanPulseISR);
   state = State::Calibrating;
+  calibrator.begin(fan);
 }
-
-uint8_t samples = 0;
 
 void loop() {
   if (emergency_stop.read() == LOW) emergencyStop();
@@ -261,11 +204,34 @@ void loop() {
   
   switch (state) {
     case State::Calibrating:
-      if (soundfx.has(SoundFX::AMBIENT)) {
+      if (calibrator.update()) {
+        const auto period = calibrator.fanPeriod();
+#ifndef NDEBUG
+        const auto freq = 1000000ul * 100ul / period;
+        const auto rpm = (60 * freq + 50) / 100;
+        Serial.print(F("  Revolution time: "));
+        Serial.print(period);
+        Serial.println(F(" us (average)"));
+        Serial.print(F("  Speed:           "));
+        Serial.print(rpm);
+        Serial.println(F(" RPM"));
+#endif
+        
+        const float pixel_freq = 1.0e6 * pattern_size / period;
+#ifndef NDEBUG
+        Serial.print(F("For "));
+        Serial.print(pattern_size);
+        Serial.print(F(" pixels per revolution, PixelTimer must run at "));
+        Serial.print(pixel_freq);
+        Serial.println(F(" Hz."));
+#endif
+        pixel_clock.begin(pixel_freq);
+
+        fan.run(fanPulseISR);
+
+        // By now, the soundfx module should be ready.
         soundfx.play(SoundFX::AMBIENT);
-        state = State::Idle;
-      } else if (++samples == 250) {
-        // Proceed without ambient sound.
+
         state = State::Idle;
       }
       break;
