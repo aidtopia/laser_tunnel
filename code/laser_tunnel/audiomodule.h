@@ -393,7 +393,12 @@ class BasicAudioModule : public Audio {
 
   private:
     void checkForIncomingMessage() {
-      while (m_stream.available() > 0) {
+      // To avoid the possibility of getting stuck in this loop
+      // indefinitely, get a snapshot of the number of bytes
+      // available now and process just those.  If processing
+      // causes another message to arrive immediately, it'll be
+      // handled on the next call.
+      for (auto i = m_stream.available(); i > 0; --i) {
         if (m_in.receive(m_stream.read())) {
           receiveMessage(m_in);
         }
