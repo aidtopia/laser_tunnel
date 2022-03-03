@@ -189,7 +189,7 @@ unsigned long measureFanPeriod() {
   fan.stop();
   pixel_clock.stop();
   interrupts();
-  soundfx.stop();
+  soundfx.play(SoundFX::EMERGENCY);
   fog_pin.clear();
   house_lights_pin.set();
 
@@ -216,13 +216,14 @@ unsigned long measureFanPeriod() {
 void beginEffect() {
   Serial.println(F("Triggered."));
   fog_pin.set();
-  soundfx.playStartleSound();
+  soundfx.play(SoundFX::STARTLE);
   state = State::Running;
 }
 
 void endEffect() {
   Serial.println(F("Effect ended."));
   fog_pin.clear();
+  soundfx.play(SoundFX::AMBIENT);
   state = State::Idle;
 }
 
@@ -286,7 +287,6 @@ void setup() {
 
   pixel_clock.begin(pixel_freq);
   fan.run(fanPulseISR);
-  Serial.println("Initialization complete.");
   state = State::Idle;
 }
 
@@ -316,8 +316,9 @@ void loop() {
         if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
           // Don't bother going idle, just run another round.
           beginEffect();
+        } else {
+          endEffect();
         }
-        endEffect();
       }
       break;
     default:

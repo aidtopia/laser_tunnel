@@ -126,7 +126,6 @@ void AdvancedAudioEventHandler::onMessageReceived(const Audio::Message &msg) {
   Serial.println();
 #endif
 
-
   switch (msg.getMessageID()) {
     case 0x3A: {
       const auto mask = msg.getParamLo();
@@ -257,7 +256,7 @@ void AdvancedAudioEventHandler::onDeviceFileCount(Device device, uint16_t count)
 }
 
 // Note that this hook receives a file index, even if the track
-// was initialized using something other than its file index.
+// was started using something other than its file index.
 //
 // The module sometimes sends these multiple times in quick
 // succession.

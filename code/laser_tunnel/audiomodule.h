@@ -174,7 +174,6 @@ class BasicAudioModule : public Audio {
 
     virtual void begin(BasicAudioEventHandler *handler = nullptr) {
       m_handler = handler;
-      reset();
     }
 
     // Call each time through `loop`.
