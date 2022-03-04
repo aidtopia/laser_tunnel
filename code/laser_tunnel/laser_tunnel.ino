@@ -52,12 +52,7 @@ Timeout<MillisClock> fog_timeout;
 PatternBuffer pattern;
 
 Animator animator;
-
-RotaryCorruption  animation0;
-WaxOn             animation1;
-Glitch            animation2;
-RadialSeeds       animation3;
-Animation *animations[] = {&animation3, &animation2, &animation1, &animation0};
+Animation animations[] = { Glitch, RadialSeeds, RotaryCorruption, Composite };
 auto animation_index = 0;
 
 // Since there are two pulses per revolution, we need to ignore
