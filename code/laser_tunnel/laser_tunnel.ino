@@ -14,6 +14,7 @@
 #include "calibrator.h"
 #include "fan.h"
 #include "laser.h"
+#include "patternbuffer.h"
 #include "pins.h"
 #include "soundfx.h"
 #include "suppressor.h"
@@ -47,59 +48,13 @@ enum class State {
 Timeout<MillisClock> effect_timeout;
 Timeout<MillisClock> fog_timeout;
 
-// Each bit in the pattern determines when the laser should
-// switch on or off.  Scanning the pattern begins with each
-// falling edge in the fan's tachometer signal, which occurs
-// twice per revolution.  Scanning wraps if the entire pattern
-// is used before the next tachometer pulse.
-const uint8_t pattern[] = {
-  0b10101010,
-  0b11001100,
-  0b11001100,
-  0b11110000,
-  0b11110000,
-  0b11110000,
-  0b11110000,
-  0b11111111,
-  0b00000000,
-  0b11111111,
-  0b00000000,
-  0b11111111,
-  0b00000000,
-  0b11111111,
-  0b00000000,
-  0b11111111,
-  0b11111111,
-  0b00000000,
-  0b00000000,
-  0b11111111,
-  0b11111111,
-  0b00000000,
-  0b00000000,
-  0b11111111,
-  0b11111111,
-  0b00000000,
-  0b00000000,
-  0b11111111,
-  0b11111111,
-  0b00000000,
-  0b00000000,
-  0b00000000
-};
-
-constexpr uint16_t pattern_byte_count = sizeof(pattern);
-constexpr uint16_t pattern_size = 8*pattern_byte_count;
-
-// `scan_start` is a bit offset into the pattern where the
-// scan should begin when the tachometer pulse is detected.
-// By animating `scan_start`, the tunnel appears to revolve.
-volatile uint8_t scan_byte = 0;
-volatile uint8_t scan_mask = 0b10000000;
-volatile uint16_t scan_start = 0;
+PatternBuffer pattern;
+volatile uint8_t scan_start = 0;
+volatile uint8_t scan_index = 0;
 
 // Since there are two pulses per revolution, we need to ignore
 // every other pulse.  `half_rev` is a toggle used by the fan
-// pulse interrupt service routines to skip every other pulse.
+// pulse interrupt service routine to skip every other pulse.
 // The variable could be function static, but that generates
 // slower code.
 bool half_rev = false;
@@ -110,23 +65,15 @@ void fanPulseISR() {
   half_rev = !half_rev;
   if (half_rev) return;
   pixel_clock.resync();  // keep the pixel clock aligned with revolutions
-  scan_byte = scan_start >> 3;
-  scan_mask = 0b10000000u >> (scan_start & 0b0111);
+  scan_index = scan_start;
 }
 
 // This is the pixel clock ISR.
 ISR(TIMER2_COMPA_vect) {
-  if (scan_mask & pattern[scan_byte]) {
+  if (pattern[scan_index++]) {
     laser.on();
   } else {
     laser.off();
-  }
-  
-  if (scan_mask != 1) {
-    scan_mask >>= 1;
-  } else {
-    scan_mask = 0b10000000;
-    scan_byte = (scan_byte + 1) % pattern_byte_count;
   }
 }
 
@@ -170,24 +117,15 @@ void beginEffect() {
     // duration potentiometer setting and the audio track.
     fog_pin.set();
     fog_timeout.set(effect_duration);
-    Serial.println(F("Starting effect for the duration of the audio track."));
-    Serial.print(F("Fog will run for up to "));
-    Serial.print(effect_duration);
-    Serial.println(F(" ms."));
   } else {
     // The effect will run for the effect duration.
     effect_timeout.set(effect_duration);
     // And the fog will run for the first half of that.
     fog_pin.set();
     fog_timeout.set(effect_duration / 2);
-    Serial.print(F("Starting effect for "));
-    Serial.print(effect_duration);
-    Serial.println(F(" ms."));
-    Serial.print(F("Fog will run for "));
-    Serial.print(effect_duration/2);
-    Serial.println(F(" ms."));
   }
   state = State::Animating;
+  pattern.setTestPattern();
 }
 
 void endEffect() {
@@ -195,6 +133,7 @@ void endEffect() {
   fog_pin.clear();
   fog_timeout.cancel();
   soundfx.play(SoundFX::AMBIENT);
+  pattern.clear();
   state = State::Idle;
 }
 
@@ -230,7 +169,7 @@ void loop() {
       if (calibrator.update()) {
         const auto period = calibrator.fanPeriod();
         const auto pixel_freq =
-          calibrator.pixelFrequency(period, pattern_size);
+          calibrator.pixelFrequency(period, pattern.size());
         pixel_clock.begin(pixel_freq);
 
         // Once the pixel clock is started, we can run the fan
@@ -257,8 +196,9 @@ void loop() {
       delay(16);  // TODO:  Eliminate and compute the animation based
                   // on actual millis() time.
       noInterrupts();
-      scan_start = (scan_start + 1) % (pattern_size);
+      scan_start -= 1;
       interrupts();
+      pattern.togglePixel(random(pattern.size()));
 
       if (fog_timeout.expired()) {
         fog_pin.clear();
