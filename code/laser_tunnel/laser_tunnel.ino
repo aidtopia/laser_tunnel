@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include "aidassert.h"
+#include "animator.h"
 #include "calibrator.h"
 #include "fan.h"
 #include "laser.h"
@@ -50,18 +51,29 @@ Timeout<MillisClock> fog_timeout;
 
 PatternBuffer pattern;
 
+RotaryCorruption animator0;
+
 // Since there are two pulses per revolution, we need to ignore
 // every other pulse.  `half_rev` is a toggle used by the fan
 // pulse interrupt service routine to skip every other pulse.
 // The variable could be function static, but that generates
-// slower code.
+// slower code.  It does not have to be volatile because it's
+// used only in the ISR.  (If you need to sync to revolutions,
+// see `rev_flag` below.
 bool half_rev = false;
+
+// Each time a new revolution begins, the ISR sets `rev_flag`.
+// An animation can watch for this flag to kick off a new frame
+// calculation.  If the animation clears the flag, it will go
+// high again at the beginning of the next revolution.
+volatile bool rev_flag = false;
 
 // Re-align the pixel clock and the pattern scanning to the
 // beginning of each revolution.
 void fanPulseISR() {
   half_rev = !half_rev;
   if (half_rev) return;
+  rev_flag = true;
   pixel_clock.resync();  // keep the pixel clock aligned with revolutions
   pattern.resync();
 }
@@ -107,7 +119,7 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void beginEffect() {
-  pattern.setTestPattern();  // temporary
+  animator0.begin(pattern);
 
   const auto audio_duration = soundfx.duration(SoundFX::STARTLE);
   if (audio_duration != 0) {
@@ -212,11 +224,8 @@ void loop() {
       }
       break;
 
-    case State::Animating:
-      delay(16);  // TODO:  Eliminate and compute the animation based
-                  // on actual millis() time.
-      pattern.rotate(-1);
-      pattern.togglePixel(random(pattern.size()));
+    case State::Animating: {
+      animator0.update(rev_flag, pattern);
 
       if (fog_timeout.expired()) {
         fog_pin.clear();
@@ -235,7 +244,8 @@ void loop() {
       
       endEffect();
       break;
-
+    }
+    
     default:
       Serial.print(F("Laser Tunnel in unexpected state: "));
       Serial.println(static_cast<int>(state));
