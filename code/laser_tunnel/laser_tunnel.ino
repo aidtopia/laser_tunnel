@@ -20,14 +20,14 @@
 #include "suppressor.h"
 #include "timeout.h"
 #include "timers.h"
+#include "trigger.h"
 
 // MCU Resources
 auto fan                  = Fan(/*tach=*/2, /*pwm=*/3);
 auto laser                = Laser(4);
 const auto emergency_stop = DigitalInputPin(5);
 auto suppressor           = Suppressor(6, 7, A2);
-const auto trigger_high   = DigitalInputPin(8);
-const auto trigger_low    = DigitalInputPin(9);
+auto trigger              = Trigger(8, 9);
 auto soundfx              = SoundFX(10, 12, 11);
 const auto status_pin     = DigitalOutputPin(LED_BUILTIN);
 const auto fog_pin        = DigitalOutputPin(14);  // a.k.a. A0
@@ -173,8 +173,7 @@ void setup() {
 
   emergency_stop.begin(INPUT_PULLUP);
   suppressor.begin();
-  trigger_high.begin();
-  trigger_low.begin(INPUT_PULLUP);
+  trigger.begin();
 
   state = State::Calibrating;
   calibrator.begin(fan);
@@ -205,8 +204,9 @@ void loop() {
       break;
 
     case State::Idle:
-      if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
+      if (trigger.read()) {
         beginEffect();
+        break;
       }
       if (soundfx.currentTrack() == SoundFX::NONE && soundfx.has(SoundFX::AMBIENT)) {
         soundfx.play(SoundFX::AMBIENT);
@@ -230,7 +230,7 @@ void loop() {
 
       if (effect_timeout.active() && !effect_timeout.expired()) break;
       
-      if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
+      if (trigger.read()) {
         // Don't bother going idle, just run another round.
         beginEffect();
         break;
