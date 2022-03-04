@@ -6,7 +6,7 @@
 
 class PatternBuffer {
   public:
-    PatternBuffer() : m_buffer() {}
+    PatternBuffer() : m_buffer(), m_scan_index(0), m_scan_start(0) {}
 
     void clear() { for (auto &b : m_buffer) b = 0; }
     constexpr size_t size() { return 8*sizeof(m_buffer); }
@@ -21,6 +21,19 @@ class PatternBuffer {
     void setTestPattern() {
       for (auto &b : m_buffer) b = 0b11110000;
     }
+
+    bool scan() { return (*this)[m_scan_index++]; }
+    void resync() { m_scan_index = m_scan_start; }
+    void rotate(int amount = 1) {
+      noInterrupts();
+      m_scan_start += static_cast<uint8_t>(amount);
+      interrupts();
+    }
+    void setRotation(int rot) {
+      noInterrupts();
+      m_scan_start = static_cast<uint8_t>(rot);
+      interrupts();
+    }
     
   private:
     uint8_t b(uint8_t i) const { return m_buffer[i >> 3]; }
@@ -28,6 +41,8 @@ class PatternBuffer {
     static uint8_t mask(uint8_t i) { return 0b10000000 >> (i & 0b0111); }
   
     uint8_t m_buffer[32];
+    uint8_t m_scan_index;
+    uint8_t m_scan_start;
 };
 
 #endif

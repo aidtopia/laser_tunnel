@@ -49,8 +49,6 @@ Timeout<MillisClock> effect_timeout;
 Timeout<MillisClock> fog_timeout;
 
 PatternBuffer pattern;
-volatile uint8_t scan_start = 0;
-volatile uint8_t scan_index = 0;
 
 // Since there are two pulses per revolution, we need to ignore
 // every other pulse.  `half_rev` is a toggle used by the fan
@@ -65,12 +63,12 @@ void fanPulseISR() {
   half_rev = !half_rev;
   if (half_rev) return;
   pixel_clock.resync();  // keep the pixel clock aligned with revolutions
-  scan_index = scan_start;
+  pattern.resync();
 }
 
 // This is the pixel clock ISR.
 ISR(TIMER2_COMPA_vect) {
-  if (pattern[scan_index++]) {
+  if (pattern.scan()) {
     laser.on();
   } else {
     laser.off();
@@ -97,6 +95,7 @@ ISR(TIMER2_COMPA_vect) {
     constexpr auto dot = 200;  // milliseconds
     constexpr auto dash = 3*dot;
     for (const char ch : "...---... ") {
+      soundfx.update();
       switch (ch) {
         case '.': status_pin.set(); delay(dot); status_pin.clear(); delay(dot); break;
         case '-': status_pin.set(); delay(dash); status_pin.clear(); delay(dot); break;
@@ -216,9 +215,7 @@ void loop() {
     case State::Animating:
       delay(16);  // TODO:  Eliminate and compute the animation based
                   // on actual millis() time.
-      noInterrupts();
-      scan_start -= 1;
-      interrupts();
+      pattern.rotate(-1);
       pattern.togglePixel(random(pattern.size()));
 
       if (fog_timeout.expired()) {
