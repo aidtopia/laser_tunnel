@@ -38,14 +38,14 @@ Timer<2> pixel_clock;
 
 enum class State {
   Initializing,
-  Calibrating,
+  Calibrating,  // measuring fan speed to set pixel clock
   Idle,         // waiting for a trigger
-  Running,      // effect animation in progress
+  Animating,
   Stopped       // we're in the emergency stop
 } state = State::Initializing;
 
-// Issuing fog is also not part of the state machine, but part
-// of the animation sequence.
+Timeout<MillisClock> effect_timeout;
+Timeout<MillisClock> fog_timeout;
 
 // Each bit in the pattern determines when the laser should
 // switch on or off.  Scanning the pattern begins with each
@@ -104,9 +104,8 @@ volatile uint16_t scan_start = 0;
 // slower code.
 bool half_rev = false;
 
-// When running the effect, we make sure to align the pixel
-// clock and the pattern scanning to the beginning of each
-// revolution.
+// Re-align the pixel clock and the pattern scanning to the
+// beginning of each revolution.
 void fanPulseISR() {
   half_rev = !half_rev;
   if (half_rev) return;
@@ -162,13 +161,39 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void beginEffect() {
-  fog_pin.set();
-  soundfx.play(SoundFX::STARTLE);
-  state = State::Running;
+  const auto effect_duration =
+    map(analogRead(effect_time_pin), 1023, 0, 3, 30)*1000;
+  if (soundfx.has(SoundFX::STARTLE)) {
+    // The effect will run for the duration of the audio track.
+    soundfx.play(SoundFX::STARTLE);
+    // And the fog will run for the shorter of the effect
+    // duration potentiometer setting and the audio track.
+    fog_pin.set();
+    fog_timeout.set(effect_duration);
+    Serial.println(F("Starting effect for the duration of the audio track."));
+    Serial.print(F("Fog will run for up to "));
+    Serial.print(effect_duration);
+    Serial.println(F(" ms."));
+  } else {
+    // The effect will run for the effect duration.
+    effect_timeout.set(effect_duration);
+    // And the fog will run for the first half of that.
+    fog_pin.set();
+    fog_timeout.set(effect_duration / 2);
+    Serial.print(F("Starting effect for "));
+    Serial.print(effect_duration);
+    Serial.println(F(" ms."));
+    Serial.print(F("Fog will run for "));
+    Serial.print(effect_duration/2);
+    Serial.println(F(" ms."));
+  }
+  state = State::Animating;
 }
 
 void endEffect() {
+  effect_timeout.cancel();
   fog_pin.clear();
+  fog_timeout.cancel();
   soundfx.play(SoundFX::AMBIENT);
   state = State::Idle;
 }
@@ -218,6 +243,7 @@ void loop() {
         state = State::Idle;
       }
       break;
+
     case State::Idle:
       if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
         beginEffect();
@@ -226,21 +252,32 @@ void loop() {
         soundfx.play(SoundFX::AMBIENT);
       }
       break;
-    case State::Running:
+
+    case State::Animating:
       delay(16);  // TODO:  Eliminate and compute the animation based
-                  // on actual millis().
+                  // on actual millis() time.
       noInterrupts();
       scan_start = (scan_start + 1) % (pattern_size);
       interrupts();
-      if (soundfx.currentTrack() != SoundFX::STARTLE) {
-        if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
-          // Don't bother going idle, just run another round.
-          beginEffect();
-        } else {
-          endEffect();
-        }
+
+      if (fog_timeout.expired()) {
+        fog_pin.clear();
+        fog_timeout.cancel();
       }
+
+      if (soundfx.currentTrack() == SoundFX::STARTLE) break;
+
+      if (effect_timeout.active() && !effect_timeout.expired()) break;
+      
+      if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
+        // Don't bother going idle, just run another round.
+        beginEffect();
+        break;
+      }
+      
+      endEffect();
       break;
+
     default:
       Serial.print(F("Laser Tunnel in unexpected state: "));
       Serial.println(static_cast<int>(state));
