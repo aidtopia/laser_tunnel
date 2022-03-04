@@ -108,32 +108,53 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void beginEffect() {
+  pattern.setTestPattern();  // temporary
+
+  const auto audio_duration = soundfx.duration(SoundFX::STARTLE);
+  if (audio_duration != 0) {
+    // We know how long to run the effect to match the audio track,
+    // so the Effect Time pot tells us the duty cycle for the fog.
+    const auto fog_duty =
+      map(analogRead(effect_time_pin), 1023, 0, 0, 100);
+    fog_pin.set();
+    fog_timeout.set(fog_duty * audio_duration / 100);
+    soundfx.play(SoundFX::STARTLE);
+    state = State::Animating;
+    return;
+  }
+
+  if (soundfx.has(SoundFX::STARTLE)) {
+    // The effect will run for the duration of the audio track,
+    // but we don't know how long that will be.  We'll run the
+    // fog for the duration indicated by the Effect Time pot.
+    // (If the audio completes sooner, we'll stop the fog then.)
+    fog_pin.set();
+    const auto fog_duration =
+      map(analogRead(effect_time_pin), 1023, 0, 3, 30)*1000;
+    fog_timeout.set(fog_duration);
+    soundfx.play(SoundFX::STARTLE);
+    state = State::Animating;
+    return;
+  }
+
+  // There's no audio, so the Effect Time pot tells us how
+  // long to animate, and we'll blast fog for the first half
+  // of that (up to 1 minute).
   const auto effect_duration =
     map(analogRead(effect_time_pin), 1023, 0, 3, 30)*1000;
-  if (soundfx.has(SoundFX::STARTLE)) {
-    // The effect will run for the duration of the audio track.
-    soundfx.play(SoundFX::STARTLE);
-    // And the fog will run for the shorter of the effect
-    // duration potentiometer setting and the audio track.
-    fog_pin.set();
-    fog_timeout.set(effect_duration);
-  } else {
-    // The effect will run for the effect duration.
-    effect_timeout.set(effect_duration);
-    // And the fog will run for the first half of that.
-    fog_pin.set();
-    fog_timeout.set(effect_duration / 2);
-  }
+  effect_timeout.set(effect_duration);
+  fog_pin.set();
+  const auto fog_duration = min(effect_duration/2, 60000);
+  fog_timeout.set(fog_duration);
   state = State::Animating;
-  pattern.setTestPattern();
 }
 
 void endEffect() {
-  effect_timeout.cancel();
   fog_pin.clear();
   fog_timeout.cancel();
-  soundfx.play(SoundFX::AMBIENT);
+  effect_timeout.cancel();
   pattern.clear();
+  soundfx.play(SoundFX::AMBIENT);
   state = State::Idle;
 }
 
