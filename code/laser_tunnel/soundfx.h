@@ -38,14 +38,16 @@ class SoundFX : public SOUNDFX_BASE_CLASS {
       return m_file_count >= file_index;
     }
 
-    bool isBusy() const {
-      return m_file_playing == STARTLE || m_busy.read() == LOW;
+    Track currentTrack() const {
+      return static_cast<Track>(m_file_playing);
     }
 
     void play(Track track) {
       if (track == NONE || !has(track)) {
-        if (isBusy()) m_module.stop();
-        m_file_playing = 0;
+        if (m_file_playing != 0) {
+          m_module.stop();
+          m_file_playing = 0;
+        }
         return;
       }
       const auto file_index = static_cast<uint16_t>(track);
@@ -96,11 +98,13 @@ class SoundFX : public SOUNDFX_BASE_CLASS {
       if (device == Audio::DEV_SDCARD && file_index == m_file_playing) {
         m_file_playing = 0;
       }
+#if 0
       // The ambient sound should loop.  In theory, the audio module
       // can do that, but it doesn't seem to work on all models, at
       // least, not with short clips.  So if the ambient track is
       // the one that just finished, we'll restart it.
       if (file_index == AMBIENT) play(AMBIENT);
+#endif
     }
 
   private:

@@ -162,14 +162,12 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void beginEffect() {
-  Serial.println(F("Triggered."));
   fog_pin.set();
   soundfx.play(SoundFX::STARTLE);
   state = State::Running;
 }
 
 void endEffect() {
-  Serial.println(F("Effect ended."));
   fog_pin.clear();
   soundfx.play(SoundFX::AMBIENT);
   state = State::Idle;
@@ -206,27 +204,12 @@ void loop() {
     case State::Calibrating:
       if (calibrator.update()) {
         const auto period = calibrator.fanPeriod();
-#ifndef NDEBUG
-        const auto freq = 1000000ul * 100ul / period;
-        const auto rpm = (60 * freq + 50) / 100;
-        Serial.print(F("  Revolution time: "));
-        Serial.print(period);
-        Serial.println(F(" us (average)"));
-        Serial.print(F("  Speed:           "));
-        Serial.print(rpm);
-        Serial.println(F(" RPM"));
-#endif
-        
-        const float pixel_freq = 1.0e6 * pattern_size / period;
-#ifndef NDEBUG
-        Serial.print(F("For "));
-        Serial.print(pattern_size);
-        Serial.print(F(" pixels per revolution, PixelTimer must run at "));
-        Serial.print(pixel_freq);
-        Serial.println(F(" Hz."));
-#endif
+        const auto pixel_freq =
+          calibrator.pixelFrequency(period, pattern_size);
         pixel_clock.begin(pixel_freq);
 
+        // Once the pixel clock is started, we can run the fan
+        // with its usual ISR.
         fan.run(fanPulseISR);
 
         // By now, the soundfx module should be ready.
@@ -239,13 +222,17 @@ void loop() {
       if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
         beginEffect();
       }
+      if (soundfx.currentTrack() == SoundFX::NONE && soundfx.has(SoundFX::AMBIENT)) {
+        soundfx.play(SoundFX::AMBIENT);
+      }
       break;
     case State::Running:
-      delay(16);
+      delay(16);  // TODO:  Eliminate and compute the animation based
+                  // on actual millis().
       noInterrupts();
       scan_start = (scan_start + 1) % (pattern_size);
       interrupts();
-      if (!soundfx.isBusy()) {
+      if (soundfx.currentTrack() != SoundFX::STARTLE) {
         if (trigger_high.read() == HIGH || trigger_low.read() == LOW) {
           // Don't bother going idle, just run another round.
           beginEffect();

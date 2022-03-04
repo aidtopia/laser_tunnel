@@ -31,6 +31,25 @@ class Calibrator {
 
     unsigned long fanPeriod() const { return m_avg_period; }
 
+    static float pixelFrequency(unsigned long period, uint16_t pattern_size) {
+      const auto freq = 1000000ul * 100ul / period;
+      const auto rpm = (60 * freq + 50) / 100;
+      Serial.print(F("  Revolution time: "));
+      Serial.print(period);
+      Serial.println(F(" us (average)"));
+      Serial.print(F("  Speed:           "));
+      Serial.print(rpm);
+      Serial.println(F(" RPM"));
+      
+      const float pixel_freq = 1.0e6 * pattern_size / period;
+      Serial.print(F("For "));
+      Serial.print(pattern_size);
+      Serial.print(F(" pixels per revolution, PixelTimer must run at "));
+      Serial.print(pixel_freq);
+      Serial.println(F(" Hz."));
+      return pixel_freq;
+    }
+
   private:
     // During calibration, this ISR notes the time (in microseconds)
     // for each revolution.
