@@ -51,7 +51,14 @@ Timeout<MillisClock> fog_timeout;
 
 PatternBuffer pattern;
 
-RotaryCorruption animator0;
+Animator animator;
+
+RotaryCorruption  animation0;
+WaxOn             animation1;
+Glitch            animation2;
+RadialSeeds       animation3;
+Animation *animations[] = {&animation3, &animation2, &animation1, &animation0};
+auto animation_index = 0;
 
 // Since there are two pulses per revolution, we need to ignore
 // every other pulse.  `half_rev` is a toggle used by the fan
@@ -119,7 +126,8 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void beginEffect() {
-  animator0.begin(pattern);
+  animator.setAnimation(animations[animation_index]);
+  animation_index = (animation_index + 1) % (sizeof(animations) / sizeof(animations[0]));
 
   const auto audio_duration = soundfx.duration(SoundFX::STARTLE);
   if (audio_duration != 0) {
@@ -225,7 +233,7 @@ void loop() {
       break;
 
     case State::Animating: {
-      animator0.update(rev_flag, pattern);
+      animator.update(rev_flag, pattern);
 
       if (fog_timeout.expired()) {
         fog_pin.clear();
