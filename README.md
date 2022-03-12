@@ -2,6 +2,11 @@
 
 Adrian McCarthy (a.k.a. Hayward Haunter) 2022
 
+**WELCOME NORCAL HAUNTERS**
+The documentation is a work in progress, but you should be able to follow along with these [build instructions][99].
+
+
+
 The Laser Tunnel is a special effects projector that creates a swirling cone of light.  They are common in Halloween displays and haunted houses. Simple ones can be made with a laser pointer aimed at a spinning mirror (in a darkened area filled with theatrical haze or fog).
 
 This version takes the basic effect it a step further.  By synchronizing pulses of the laser with the motor spinning the mirror, the cone of light can be given a pattern, and that pattern can be animated.
@@ -10,7 +15,7 @@ This version takes the basic effect it a step further.  By synchronizing pulses 
 
 ## Features
 
-Version 1 of this project was the Make & Take project for the [Northern California Haunters Group][2]
+Version 1 of this project is the Make & Take project for the [Northern California Haunters Group][2]
 in March 2022.
 
 This version:
@@ -39,6 +44,8 @@ Everything is nearly self-contained, though the KiCad files depend on a couple s
 [1]: https://youtu.be/wGUYBSXcNQk
 [2]: https://norcalhaunters.com
 [3]: https://github.com/aidtopia/aid_kicad_library
+
+[99]: https://github.com/aidtopia/laser_tunnel/blob/main/docs/build.md
 
 ## License
 
