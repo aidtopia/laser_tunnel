@@ -437,6 +437,7 @@ module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4) {
     box = sqrt(2)*outer_d;
     intersection() {
         r = inner_d/2;
+        translate([0, 0, nozzle_d/2])
         translate([r, 0, 0]) rotate([0, angle, 0]) translate([-r, 0, 0])
         difference() {
             translate([0, 0, mirror_th-h]) cylinder(d=outer_d, h=h);
