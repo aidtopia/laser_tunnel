@@ -361,13 +361,17 @@ module bracket(
         inner_d = laser_dia + nozzle_d/2;
         outer_d = laser_dia + 2*thickness;
         mast_h = fan_h/2;
+        mast_dia2 = max(laser_l, outer_d);
+        mast_dia1 = min(laser_l, outer_d);
         split = 3*nozzle_d;
         translate([0, 0, laser_l/2]) {
             if ($preview) { #laser_beam(distance); }
             difference() {
                 union() {
                     cylinder(h=laser_l, d=outer_d, center=true, $fn=8);
-                    translate([0, -mast_h/2, 0]) cube([thickness, mast_h, laser_l], center=true);
+                    translate([0, -mast_h/2, 0]) rotate([90, 0, 0])
+                        cylinder(h=mast_h, d1=mast_dia1, d2=mast_dia2,
+                                 center=true);
                 }
                 cylinder(h=laser_l+2, d=inner_d, center=true, $fs=nozzle_d/2);
                 translate([0, laser_dia/2, 0])
