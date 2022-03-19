@@ -27,10 +27,10 @@ Laser_Angle = 15; // [0:15]
 // Screws used to mount the printed circuit board are typically M3, but you can choose #4-40 if metric screws aren't available. Check OpenSCAD's console output for the proper screw length.
 PCB_Screws = "M3"; // [M3, #4-40]
 
-// Optional flat-head screws used to anchor the bracket to a surface.
+// Optional flat-head screws used to anchor the chassis to a surface.
 Anchor_Screws = "none"; // [none, #6-32, #8-32]
 
-// Thickness of the bracket walls. (mm)
+// Thickness of the chassis walls. (mm)
 Thickness = 1.6; // [1.2:0.4:3.2]
 
 // The mirror should not be wider than the hub of the fan. (mm)
@@ -212,7 +212,7 @@ module credits() {
         }
 }
 
-module bracket(
+module chassis(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
     pcb_screw="M3", anchor_screw="#6-32", thickness=2,
@@ -281,7 +281,7 @@ module bracket(
     
     // Transforms its children just as the fan_model must be
     // transformed to put it into its position relative to
-    // the bracket.
+    // the chassis.
     module orient_fan() {
         translate([0, support_d/2+support_extra_d, fan_h/2+thickness])
         rotate([90, 0, 0]) children();
@@ -289,7 +289,7 @@ module bracket(
 
     // Transforms its children just as the pcb_model must be
     // transformed to put it into its position relative to
-    // the bracket.
+    // the chassis.
     module orient_pcb() {
         translate([0, -thickness, elevation])
         rotate([0, 0, -90])
@@ -456,7 +456,7 @@ module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4) {
 
 // kit() creates just the printable parts
 module kit() {
-    bracket(
+    chassis(
         fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
         laser_dia=Laser_Diameter, laser_l=Laser_Length,
         distance=Laser_Distance, angle=Laser_Angle,
@@ -482,7 +482,7 @@ module kit() {
 
 // assembly() shows the parts in context
 module assembly() {
-    bracket(
+    chassis(
         fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
         laser_dia=Laser_Diameter, laser_l=Laser_Length,
         distance=Laser_Distance, angle=Laser_Angle,
