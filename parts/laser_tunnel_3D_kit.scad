@@ -98,9 +98,12 @@ function find_fan_params(size) =
            str("fan size ", size, " mm not found in table"))
     candidate;
 
+function fan_rotation_angle(time=$t, rpm=1800, fps=30) =
+    360 * rpm/60 * time/fps;
+
 // A simple model of a PC case fan, centered at the origin,
 // with the axis of rotation along the z-axis.
-module fan_model(fan_size=80, fan_depth=25.4, envelope=false, rpm=0, nozzle_d=0.4) {
+module fan_model(fan_size=80, fan_depth=25.4, envelope=false, rotation_angle=0, nozzle_d=0.4) {
     extra = envelope ? nozzle_d : 0;
     fan_params = find_fan_params(fan_size);
     fan_w = fan_params[0] + extra;
@@ -148,19 +151,19 @@ module fan_model(fan_size=80, fan_depth=25.4, envelope=false, rpm=0, nozzle_d=0.
 
     color("gray") body();
     if (!envelope) {
-        rotate([0, 0, rpm/60*$t/30*360]) {
+        rotate([0, 0, rotation_angle]) {
             color("gray") {
                 hub();
                 blades();
-            }
-            if ($preview) {
-                // Make the front (air intake) distinguishable from the back.
-                color("white") translate([0, 0, fan_d/2+1.1]) sphere(d=hub_dia/4);
             }
         }
     }
 }
 
+module laser_beam(distance, beam_dia=1.5) {
+    translate([0, 0, -distance]) cylinder(h=distance, d=beam_dia);
+}
+    
 function find_pcb_params() = [
     // width, length, thickness
     75, 75, 1.6,
@@ -353,10 +356,6 @@ module bracket(
         }
     }
 
-    module laser_beam(distance) {
-        translate([0, 0, -distance]) cylinder(h=distance, d=laser_dia/4);
-    }
-    
     module laser_mount() {
         inner_d = laser_dia + nozzle_d/2;
         outer_d = laser_dia + 2*thickness;
@@ -365,7 +364,6 @@ module bracket(
         mast_dia1 = min(laser_l, outer_d);
         split = 3*nozzle_d;
         translate([0, 0, laser_l/2]) {
-            if ($preview) { #laser_beam(distance); }
             difference() {
                 union() {
                     cylinder(h=laser_l, d=outer_d, center=true, $fn=8);
@@ -422,15 +420,17 @@ module bracket(
                     ], thickness)));
         }
         
-        // The construction process above leaves a few bits that need to
-        // be scraped off.
+        // The construction process leaves a few bits that need to be
+        // scraped off the bottom.
         linear_extrude(100) footprint();
     }
 
     // Preview mode shows the kit in the context of some non-printed parts.
     if ($preview) {
+        rot = fan_rotation_angle(time=$t, rpm=1800, fps=30);
         orient_pcb() pcb_model();
-        orient_fan() fan_model(fan_size, fan_d, rpm=1800);
+        orient_fan() fan_model(fan_size, fan_d, rotation_angle=rot);
+        orient_laser() #laser_beam(distance);
     }
 }
 
@@ -454,26 +454,40 @@ module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4) {
     }
 }
 
-bracket(
-    fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
-    laser_dia=Laser_Diameter, laser_l=Laser_Length,
-    distance=Laser_Distance, angle=Laser_Angle,
-    pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
-    thickness=Thickness, nozzle_d=Nozzle_Diameter);
+// kit() creates just the printable parts
+module kit() {
+    bracket(
+        fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
+        laser_dia=Laser_Diameter, laser_l=Laser_Length,
+        distance=Laser_Distance, angle=Laser_Angle,
+        pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
+        thickness=Thickness, nozzle_d=Nozzle_Diameter);
 
+    translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
+        if (Mirror_Angle_1 != 0) {
+            deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+        }
 
-translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
-    if (Mirror_Angle_1 != 0) {
-        deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
-    }
+        if (Mirror_Angle_2 != 0) {
+            translate([0, -(1.2 * Mirror_Diameter), 0])
+            deflector(Mirror_Angle_2, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+        }
 
-    if (Mirror_Angle_2 != 0) {
-        translate([0, -(1.2 * Mirror_Diameter), 0])
-        deflector(Mirror_Angle_2, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
-    }
-
-    if (Mirror_Angle_3 != 0) {
-        translate([0, -2*(1.2*Mirror_Diameter), 0])
-        deflector(Mirror_Angle_3, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+        if (Mirror_Angle_3 != 0) {
+            translate([0, -2*(1.2*Mirror_Diameter), 0])
+            deflector(Mirror_Angle_3, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
+        }
     }
 }
+
+// assembly() shows the parts in context
+module assembly() {
+    bracket(
+        fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
+        laser_dia=Laser_Diameter, laser_l=Laser_Length,
+        distance=Laser_Distance, angle=Laser_Angle,
+        pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
+        thickness=Thickness, nozzle_d=Nozzle_Diameter);
+}
+
+if ($preview) assembly(); else kit();
