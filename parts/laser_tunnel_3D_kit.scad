@@ -57,16 +57,6 @@ module __Customizer_Limit__ () {}
 use <aidbolt.scad>
 use <aidutil.scad>
 
-module udi(option="u") {
-    if (option == "i" && $children > 1) {
-        intersection() { children([0]); children([1:$children-1]); }
-    } else if (option == "d" && $children > 1) {
-        difference() { children([0]); children([1:$children-1]); }
-    } else {
-        union() children();
-    }
-}
-
 module bosses(locations, boss_h) {
     for (l = locations) {
         translate([l.x, l.y, -boss_h]) boss(l[2], boss_h);
