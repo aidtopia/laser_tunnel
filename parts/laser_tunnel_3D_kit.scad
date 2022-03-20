@@ -425,8 +425,8 @@ module chassis(
         linear_extrude(100) footprint();
     }
 
-    // Preview mode shows the kit in the context of some non-printed parts.
-    if ($preview && assembly != "") {
+    if (assembly != "") {
+        // Show the kit in the context of some non-printed parts.
         parts = split(assembly, ",");
         rot = fan_rotation_angle(time=$t, rpm=1800, fps=30);
         if (search(["pcb"], parts) != [[]]) {
@@ -479,6 +479,13 @@ module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mir
     }
 }
 
+module deflectors(all_angles=[10], mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
+    angles = [ for (a = all_angles) if (a != 0) a ];
+    for (i = [0:len(angles)-1])
+        translate([0, -i*(1.2 * mirror_d), 0])
+            deflector(angles[i], mirror_d, mirror_th, nozzle_d, show_mirror);
+}
+
 module kit(assembly="") {
     chassis(
         fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
@@ -488,20 +495,9 @@ module kit(assembly="") {
         thickness=Thickness, nozzle_d=Nozzle_Diameter, assembly=assembly);
 
     translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
-        if (Mirror_Angle_1 != 0) {
-            deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
-        }
-
-        if (Mirror_Angle_2 != 0) {
-            translate([0, -(1.2 * Mirror_Diameter), 0])
-            deflector(Mirror_Angle_2, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
-        }
-
-        if (Mirror_Angle_3 != 0) {
-            translate([0, -2*(1.2*Mirror_Diameter), 0])
-            deflector(Mirror_Angle_3, Mirror_Diameter, Mirror_Thickness, Nozzle_Diameter, $fn=92);
-        }
+        all_angles = [Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3];
+        deflectors(all_angles, mirror_d=Mirror_Diameter, mirror_th=Mirror_Thickness, nozzle_d=Nozzle_Diameter, show_mirror=false);
     }
 }
 
-kit("fan, beam, mirror");
+kit($preview ? "fan, beam, mirror" : "");
