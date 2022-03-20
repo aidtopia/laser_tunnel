@@ -161,7 +161,7 @@ module fan_model(fan_size=80, fan_depth=25.4, envelope=false, rotation_angle=0, 
 }
 
 module laser_beam(distance, beam_dia=1.5) {
-    translate([0, 0, -distance]) cylinder(h=distance, d=beam_dia);
+    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
 }
     
 function find_pcb_params() = [
