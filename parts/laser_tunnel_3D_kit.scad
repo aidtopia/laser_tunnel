@@ -71,29 +71,8 @@ module bores(locations, depth, threads="none", head="pan") {
     }
 }
 
-function fan_rotation_angle(time=$t, rpm=1800, fps=30) =
-    360 * rpm/60 * time/fps;
-
-module laser_beam(distance, beam_dia=1.5) {
-    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
-}
-    
-function find_pcb_params() = [
-    // width, length, thickness
-    75, 75, 1.6,
-    [  // mounting hole locations with sizes
-        [ 4.5, 75 -  5.5, "M3"],
-        [ 4.5, 75 - 50.0, "M3"],
-        [70.5, 75 - 34.0, "M3"]
-    ],
-    [  // additional points for support--no screws
-        [45,   75 - 65.0, 5],
-    ]
-];
-
 // A simple model of a printed circuit board for the project.
-module pcb_model() {
-    pcb_params = find_pcb_params();
+module pcb_model(pcb_params) {
     w = pcb_params[0];
     l = pcb_params[1];
     th = pcb_params[2];
@@ -106,6 +85,26 @@ module pcb_model() {
     }
 }
 
+pcb_params = [
+    // width, length, thickness
+    75, 75, 1.6,
+    [  // mounting hole locations with sizes
+        [ 4.5, 75 -  5.5, "M3"],
+        [ 4.5, 75 - 50.0, "M3"],
+        [70.5, 75 - 34.0, "M3"]
+    ],
+    [  // additional points for support--no screws
+        [45,   75 - 65.0, 5],
+    ]
+];
+
+function fan_rotation_angle(time=$t, rpm=1800, fps=30) =
+    360 * rpm/60 * time/fps;
+
+module laser_beam(distance, beam_dia=1.5) {
+    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
+}
+    
 module branding() {
     font = "Liberation Sans:style=Bold Italic";
     scale([1/130, 1/16, 1])
@@ -147,7 +146,6 @@ module chassis(
     support_full_d = fan_screw_l;
     support_extra_d = support_full_d - support_d;
 
-    pcb_params = find_pcb_params();
     pcb_w = pcb_params[0];
     pcb_l = pcb_params[1];
     pcb_th = pcb_params[2];
@@ -344,7 +342,7 @@ module chassis(
         parts = split(assembly, ",");
         rot = fan_rotation_angle(time=$t, rpm=1800, fps=30);
         if (search(["pcb"], parts) != [[]]) {
-            orient_pcb() pcb_model();
+            orient_pcb() pcb_model(pcb_params);
         }
         if (search(["fan"], parts) != [[]]) {
             orient_fan() fan_model(fan_size, fan_d, rotation_angle=rot);
@@ -407,11 +405,10 @@ module kit(assembly="") {
         distance=Laser_Distance, angle=Laser_Angle,
         pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
         thickness=Thickness, nozzle_d=Nozzle_Diameter, assembly=assembly);
-
     translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
         all_angles = [Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3];
         deflectors(all_angles, mirror_d=Mirror_Diameter, mirror_th=Mirror_Thickness, nozzle_d=Nozzle_Diameter, show_mirror=false);
     }
 }
 
-kit($preview ? "fan, beam, mirror" : "");
+kit($preview ? "fan, pcb, beam, mirror" : "");
