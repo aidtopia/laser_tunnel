@@ -85,6 +85,10 @@ module pcb_model(pcb_params) {
     }
 }
 
+module laser_beam(distance, beam_dia=1.5) {
+    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
+}
+    
 pcb_params = [
     // width, length, thickness
     75, 75, 1.6,
@@ -101,10 +105,6 @@ pcb_params = [
 function fan_rotation_angle(time=$t, rpm=1800, fps=30) =
     360 * rpm/60 * time/fps;
 
-module laser_beam(distance, beam_dia=1.5) {
-    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
-}
-    
 module branding() {
     font = "Liberation Sans:style=Bold Italic";
     scale([1/130, 1/16, 1])
@@ -125,7 +125,7 @@ module credits() {
         }
 }
 
-module chassis(
+module laser_tunnel(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
     pcb_screw="M3", anchor_screw="#6-32", thickness=2,
@@ -191,6 +191,37 @@ module chassis(
         ], anchor_screw) :
         [];
     
+    module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
+        h = mirror_d;
+        inner_d = mirror_d + nozzle_d;
+        outer_d = inner_d + 2;
+        pop_d = max(4, mirror_d/6);
+        box = sqrt(2)*outer_d;
+        intersection() {
+            r = inner_d/2;
+            translate([0, 0, nozzle_d/2])
+            translate([r, 0, 0]) rotate([0, angle, 0]) translate([-r, 0, 0])
+            union() {
+                difference() {
+                    translate([0, 0, mirror_th-h]) cylinder(d=outer_d, h=h);
+                    translate([0, 0, 0.1]) cylinder(d=inner_d, h=h);
+                    translate([r/1.5, 0, -h+0.2]) cylinder(d=pop_d, h=h);
+                }
+                if (show_mirror) {
+                    color("white") cylinder(d=mirror_d, h=mirror_th);
+                }
+            }
+            translate([-box/2, -box/2, 0]) cube(box);
+        }
+    }
+    
+    module deflectors(all_angles=[10], mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
+        angles = [ for (a = all_angles) if (a != 0) a ];
+        for (i = [0:len(angles)-1])
+            translate([0, -i*(1.2 * mirror_d), 0])
+                deflector(angles[i], mirror_d, mirror_th, nozzle_d, show_mirror);
+    }
+
     // Transforms its children just as the fan_model must be
     // transformed to put it into its position relative to
     // the chassis.
@@ -337,6 +368,13 @@ module chassis(
         linear_extrude(100) footprint();
     }
 
+    translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
+        all_angles = [Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3];
+        deflectors(all_angles, mirror_d=Mirror_Diameter,
+            mirror_th=Mirror_Thickness, nozzle_d=Nozzle_Diameter,
+            show_mirror=false);
+    }
+
     if (assembly != "") {
         // Show the kit in the context of some non-printed parts.
         parts = split(assembly, ",");
@@ -352,63 +390,29 @@ module chassis(
         }
         if (search(["mirror"], parts) != [[]]) {
             orient_fan() translate([0, 0, fan_d/2]) rotate([0, 0, rot])
-                deflector(Mirror_Angle_1, Mirror_Diameter, Mirror_Thickness, nozzle_d, show_mirror=true);
+                deflector(Mirror_Angle_1, Mirror_Diameter,
+                          Mirror_Thickness, nozzle_d, show_mirror=true);
         }
 
         if (search(["beam"], parts) != [[]] && search(["mirror"], parts) != [[]]) {
             // Show the reflection of the beam.
             orient_fan() translate([0, 0, fan_d/2])  // origin of reflection
-            rotate([180, 0, 0])  // reflect back toward the laser
             rotate([-angle, 0, 0])  // for offset angle of the laser
-            rotate([0, 0, -rot])  // for deflector rotation
-            rotate([0, -2*Mirror_Angle_1, 0])  // for deflector angle
+            rotate([0, 0, rot])  // for deflector rotation
+            rotate([0, 2*Mirror_Angle_1, 0])  // for deflector angle
+            rotate([180, 0, 0])  // reflect back toward the laser
             laser_beam(10*distance);
         }
     }
 }
 
-module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
-    h = mirror_d;
-    inner_d = mirror_d + nozzle_d;
-    outer_d = inner_d + 2;
-    pop_d = max(4, mirror_d/6);
-    box = sqrt(2)*outer_d;
-    intersection() {
-        r = inner_d/2;
-        translate([0, 0, nozzle_d/2])
-        translate([r, 0, 0]) rotate([0, angle, 0]) translate([-r, 0, 0])
-        union() {
-            difference() {
-                translate([0, 0, mirror_th-h]) cylinder(d=outer_d, h=h);
-                translate([0, 0, 0.1]) cylinder(d=inner_d, h=h);
-                translate([r/1.5, 0, -h+0.2]) cylinder(d=pop_d, h=h);
-            }
-            if (show_mirror) {
-                color("white") cylinder(d=mirror_d, h=mirror_th);
-            }
-        }
-        translate([-box/2, -box/2, 0]) cube(box);
-    }
-}
-
-module deflectors(all_angles=[10], mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
-    angles = [ for (a = all_angles) if (a != 0) a ];
-    for (i = [0:len(angles)-1])
-        translate([0, -i*(1.2 * mirror_d), 0])
-            deflector(angles[i], mirror_d, mirror_th, nozzle_d, show_mirror);
-}
-
 module kit(assembly="") {
-    chassis(
+    laser_tunnel(
         fan_size=Fan_Size, fan_d=Fan_Depth, fan_screw=Fan_Screws, 
         laser_dia=Laser_Diameter, laser_l=Laser_Length,
         distance=Laser_Distance, angle=Laser_Angle,
         pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
         thickness=Thickness, nozzle_d=Nozzle_Diameter, assembly=assembly);
-    translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
-        all_angles = [Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3];
-        deflectors(all_angles, mirror_d=Mirror_Diameter, mirror_th=Mirror_Thickness, nozzle_d=Nozzle_Diameter, show_mirror=false);
-    }
 }
 
 kit($preview ? "fan, pcb, beam, mirror" : "");
