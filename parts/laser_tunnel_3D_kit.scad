@@ -129,6 +129,7 @@ module laser_tunnel(
     fan_size=80, fan_d=25.4, fan_screw="M4",
     laser_dia=6, laser_l=6, distance=100, angle=15,
     pcb_screw="M3", anchor_screw="#6-32", thickness=2,
+    mirror_d=25.4, mirror_th=1.75, mirror_angles=[5],
     nozzle_d=0.4, assembly=""
 ) {
     fan_params = find_fan_params(fan_size);
@@ -190,6 +191,9 @@ module laser_tunnel(
             [-x_lanchor, y_lanchor + anchor_d/2]
         ], anchor_screw) :
         [];
+
+    deflector_angles = [for (a=mirror_angles) if (a != 0) a];
+    mirror_a = len(deflector_angles) > 0 ? deflector_angles[0] : 5;
     
     module deflector(angle=10, mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
         h = mirror_d;
@@ -215,11 +219,13 @@ module laser_tunnel(
         }
     }
     
-    module deflectors(all_angles=[10], mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4, show_mirror=false) {
-        angles = [ for (a = all_angles) if (a != 0) a ];
-        for (i = [0:len(angles)-1])
-            translate([0, -i*(1.2 * mirror_d), 0])
-                deflector(angles[i], mirror_d, mirror_th, nozzle_d, show_mirror);
+    module deflectors(angles=[5], mirror_d=25.4, mirror_th=1.75, nozzle_d=0.4) {
+        count = len(angles);
+        if (count > 0)
+            for (i = [0:count-1])
+                translate([0, -i*(1.2 * mirror_d), 0])
+                    deflector(angles[i], mirror_d, mirror_th,
+                              nozzle_d, show_mirror=false);
     }
 
     // Transforms its children just as the fan_model must be
@@ -368,11 +374,9 @@ module laser_tunnel(
         linear_extrude(100) footprint();
     }
 
-    translate([Fan_Size/2 + 3*Thickness + Mirror_Diameter/2, 0, 0]) {
-        all_angles = [Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3];
-        deflectors(all_angles, mirror_d=Mirror_Diameter,
-            mirror_th=Mirror_Thickness, nozzle_d=Nozzle_Diameter,
-            show_mirror=false);
+    translate([fan_size/2 + 3*thickness + mirror_d/2, 0, 0]) {
+        deflectors(deflector_angles, mirror_d=mirror_d,
+            mirror_th=mirror_th, nozzle_d=nozzle_d);
     }
 
     if (assembly != "") {
@@ -389,19 +393,19 @@ module laser_tunnel(
             orient_laser() laser_beam(distance);
         }
         if (search(["mirror"], parts) != [[]]) {
+            if (search(["beam"], parts) != [[]]) {
+                // Show the reflection of the beam.
+                orient_fan()
+                translate([0, 0, fan_d/2])  // origin of reflection
+                rotate([-angle, 0, 0])  // for offset angle of the laser
+                rotate([0, 0, rot])  // for deflector rotation
+                rotate([0, 2*mirror_a, 0])  // for deflector angle
+                rotate([180, 0, 0])  // reflect back toward the laser
+                laser_beam(10*distance);
+            }
             orient_fan() translate([0, 0, fan_d/2]) rotate([0, 0, rot])
-                deflector(Mirror_Angle_1, Mirror_Diameter,
-                          Mirror_Thickness, nozzle_d, show_mirror=true);
-        }
-
-        if (search(["beam"], parts) != [[]] && search(["mirror"], parts) != [[]]) {
-            // Show the reflection of the beam.
-            orient_fan() translate([0, 0, fan_d/2])  // origin of reflection
-            rotate([-angle, 0, 0])  // for offset angle of the laser
-            rotate([0, 0, rot])  // for deflector rotation
-            rotate([0, 2*Mirror_Angle_1, 0])  // for deflector angle
-            rotate([180, 0, 0])  // reflect back toward the laser
-            laser_beam(10*distance);
+                deflector(mirror_a, mirror_d, mirror_th, nozzle_d,
+                          show_mirror=true);
         }
     }
 }
@@ -412,7 +416,10 @@ module kit(assembly="") {
         laser_dia=Laser_Diameter, laser_l=Laser_Length,
         distance=Laser_Distance, angle=Laser_Angle,
         pcb_screw=PCB_Screws, anchor_screw=Anchor_Screws,
-        thickness=Thickness, nozzle_d=Nozzle_Diameter, assembly=assembly);
+        thickness=Thickness,
+        mirror_d=Mirror_Diameter, mirror_th=Mirror_Thickness,
+        mirror_angles=[Mirror_Angle_1, Mirror_Angle_2, Mirror_Angle_3],
+        nozzle_d=Nozzle_Diameter, assembly=assembly);
 }
 
-kit($preview ? "fan, pcb, beam, mirror" : "");
+kit($preview ? "fan, pcb, mirror" : "");
