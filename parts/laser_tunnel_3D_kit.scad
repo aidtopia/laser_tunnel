@@ -86,7 +86,7 @@ module pcb_model(pcb_params) {
 }
 
 module laser_beam(distance, beam_dia=1.5) {
-    translate([0, 0, -distance]) #cylinder(h=distance, d=beam_dia);
+    translate([0, 0, -distance]) color("red") cylinder(h=distance, d=beam_dia);
 }
     
 pcb_params = [
@@ -339,6 +339,16 @@ module laser_tunnel(
         translate([0, 0, anchor_h]) children();
     }
     
+    module beam_reflection(rot=0) {
+        orient_fan()
+        translate([0, 0, fan_d/2])  // origin of reflection
+        rotate([-angle, 0, 0])      // for offset angle of the laser
+        rotate([0, 0, rot])         // for deflector rotation
+        rotate([0, 2*mirror_a, 0])  // for deflector angle
+        rotate([180, 0, 0])         // reflect back toward the laser
+        laser_beam(20*distance);
+    }
+    
     intersection() {
         difference() {
             union() {
@@ -395,17 +405,15 @@ module laser_tunnel(
         if (search(["mirror"], parts) != [[]]) {
             if (search(["beam"], parts) != [[]]) {
                 // Show the reflection of the beam.
-                orient_fan()
-                translate([0, 0, fan_d/2])  // origin of reflection
-                rotate([-angle, 0, 0])  // for offset angle of the laser
-                rotate([0, 0, rot])  // for deflector rotation
-                rotate([0, 2*mirror_a, 0])  // for deflector angle
-                rotate([180, 0, 0])  // reflect back toward the laser
-                laser_beam(10*distance);
+                beam_reflection(rot);
             }
             orient_fan() translate([0, 0, fan_d/2]) rotate([0, 0, rot])
                 deflector(mirror_a, mirror_d, mirror_th, nozzle_d,
                           show_mirror=true);
+        }
+        if (search(["tunnel"], parts) != [[]]) {
+            orient_laser() laser_beam(distance);
+            for (r = [0:6:359]) beam_reflection(r);
         }
     }
 }
@@ -422,4 +430,4 @@ module kit(assembly="") {
         nozzle_d=Nozzle_Diameter, assembly=assembly);
 }
 
-kit($preview ? "fan, pcb, mirror" : "");
+kit($preview ? "fan, pcb, mirror, beam" : "");
