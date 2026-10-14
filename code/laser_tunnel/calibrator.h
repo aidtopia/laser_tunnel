@@ -8,7 +8,7 @@ class Calibrator {
     Calibrator() : m_samples(250), m_avg_period(0uL) {}
 
     void begin(Fan &fan) {
-      Serial.println("Measuring fan speed...");
+      Serial.println(F("Measuring fan speed..."));
       m_avg_period = 0ul;
       m_last_rev_time = micros();
       m_samples = 250;

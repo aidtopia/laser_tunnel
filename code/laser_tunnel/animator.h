@@ -64,8 +64,8 @@ void RadialSeeds(PatternBuffer &pattern, unsigned frame) {
   }
 }
 
-void RotaryCorruption(PatternBuffer &pattern, unsigned /*frame*/) {
-  pattern.rotate(-1);
+void RotaryCorruption(PatternBuffer &pattern, unsigned frame) {
+  if (frame & 0x1) pattern.rotate(1);
   pattern.togglePixel(random(pattern.size()));
 }
 

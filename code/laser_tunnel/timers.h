@@ -14,11 +14,11 @@ class Timer {
 
     void start(uint8_t prescaler_index, uint8_t limit);
     void start(float freq) {
-      Serial.print("  prescaler * limit = ");
+      Serial.print(F("  prescaler * limit = "));
       Serial.print(F_CPU);
-      Serial.print("Hz / ");
+      Serial.print(F("Hz / "));
       Serial.print(freq);
-      Serial.print("Hz = ");
+      Serial.print(F("Hz = "));
       const float pre_times_lim = F_CPU / freq;
       Serial.println(pre_times_lim);
 

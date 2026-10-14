@@ -52,7 +52,8 @@ Timeout<MillisClock> fog_timeout;
 PatternBuffer pattern;
 
 Animator animator;
-Animation animations[] = { Glitch, RadialSeeds, RotaryCorruption, Composite };
+//Animation animations[] = { Glitch, RadialSeeds, RotaryCorruption, Composite };
+Animation animations[] = { RotaryCorruption };
 auto animation_index = 0;
 
 // Since there are two pulses per revolution, we need to ignore
@@ -103,8 +104,8 @@ ISR(TIMER2_COMPA_vect) {
   // we'll set it for consistency.
   state = State::Stopped;
 
-  Serial.println("Emergency Stop!");
-  Serial.println("Reset the microcontroller to restart.");
+  Serial.println(F("Emergency Stop!"));
+  Serial.println(F("Reset the microcontroller to restart."));
   for (;;) {
     constexpr auto dot = 200;  // milliseconds
     constexpr auto dash = 3*dot;
